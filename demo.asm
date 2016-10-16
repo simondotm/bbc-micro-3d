@@ -1,5 +1,5 @@
 
-WIREFRAME = FALSE
+WIREFRAME = TRUE
 
 IF WIREFRAME
     lineroutine=&26BA
@@ -121,18 +121,21 @@ EQUD 0:EQUD 0
 EQUD &08040201:EQUD &80402010
 
 .vdus
-EQUB 22,5
-EQUB 23,0,10,32,0,0,0,0,0,0
-EQUB 255
+IF WIREFRAME
+    EQUB 22,4
+ELSE
+    EQUB 22,5
+ENDIF
 
-;EQUD &170516:EQUD &200A
-;EQUD 0:EQUB &FF
+    EQUB 23,0,10,32,0,0,0,0,0,0
+    EQUB 255
 
 .entry
 {
 
     LDX#0
-    STX space:STX p
+    STX adr
+    STX space:STX p:STX f:STX flicker
     LDA#1:STA pause
     .loop
     LDA vdus,X:BMI nomess:JSR &FFEE
@@ -142,6 +145,7 @@ EQUB 255
     JSR load_models
 
     SEI:LDA#&40:STA &D00:LDX#&FF:TXS
+
     LDA#0:STA rx
     LDA#&7B:STA ry
     LDA#&C3:STA rz
@@ -163,26 +167,54 @@ EQUB 255
     LDA &1201,Y:STA &1100,X
     DEY:INX:BNE loop3
     JSR back
+
+IF WIREFRAME
+    LDA#&58:STA scrstrt
+ELSE
     LDA#&35:STA scrstrt
+ENDIF
+
     .frame
     LDA#&81:LDX#&9D:LDY#&FF:JSR &FFF4
     TYA:BEQ nopress:LDA space:BNE nopress
     JSR modify:LDA#1
     .nopress STA space
+
+IF WIREFRAME
+    LDA scrstrt:LSRA:LSRA:LSRA
+    LDX#&C:STX &FE00:STA &FE01
+    LDA#&81:LDX#&BC:LDY#&FF:JSR &FFF4
+    TYA:BEQ nof:LDA f:BNE nof
+    LDA flicker:EOR #1:STA flicker:LDA#1
+    .nof STA f
+    LDA flicker:AND pause:BNE fastandflicker
+    CLI:LDA#19:JSR &FFF4:SEI
+    .fastandflicker
+    LDA scrstrt:EOR #&68:STA scrstrt
+ENDIF
+
     JSR wipe
     LDA#&81:LDX#&C8:LDY#&FF:JSR &FFF4
     TYA:BEQ nop:LDA p:BNE nop
     LDA pause:EOR #1:STA pause:LDA#1
     .nop STA p
     LDA pause:BEQ nrot
-    JSR rotate:JSR rotate
+    JSR rotate
+IF WIREFRAME == FALSE    
+    JSR rotate
+ENDIF
     .nrot
+
+
     JSR matrix
     JSR newpoints
     JSR hiddensurfaceremoval
     JSR hiddenlineremoval
     JSR drawlines
+IF WIREFRAME == FALSE
     JSR fill
+ENDIF
+
     JMP frame
 
 }
@@ -205,6 +237,32 @@ EQUB 255
     RTS
 }
 
+IF WIREFRAME
+.wipe
+{
+    LDX#&2F:CMP#&30:BNE wipe0:JMP wipe1
+    .wipe0 LDA#0
+    .loop
+    FOR Y%, &5D40, &7A00, &140
+        FOR X%, Y%, Y%+144, 48
+            STA X%,X
+        NEXT
+    NEXT
+    DEX:BMI wiped:JMP loop
+    .wiped RTS
+    .wipe1 LDA#0
+    .loop2
+    FOR Y%, &3540, &5200, &140
+        FOR X%, Y%, Y%+144, 48
+            STA X%,X
+        NEXT
+    NEXT
+    DEX:BMI wiped1:JMP loop2
+    .wiped1 
+    RTS
+}
+
+ELSE
 .wipe 
 {
     LDA#0:LDX#&2F
@@ -249,6 +307,8 @@ EQUB 255
     .filled 
     RTS
 }
+
+ENDIF
 
 .unitvectors
 EQUB u00 AND &FF:EQUB u01 AND &FF:EQUB u02 AND &FF
@@ -538,6 +598,16 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     STY line+7
     .loopC
     LSR surfs+1:ROR surfs:BCS nosurf
+IF WIREFRAME
+    LDA(lines),Y:ORA line:STA line:INY
+    LDA(lines),Y:ORA line+1:STA line+1:INY
+    LDA(lines),Y:ORA line+2:STA line+2:INY
+    LDA(lines),Y:ORA line+3:STA line+3:INY
+    LDA(lines),Y:ORA line+4:STA line+4:INY
+    LDA(lines),Y:ORA line+5:STA line+5:INY
+    LDA(lines),Y:ORA line+6:STA line+6:INY
+    LDA(lines),Y:ORA line+7:STA line+7:INY
+ ELSE
     LDA(lines),Y:EOR line:STA line:INY
     LDA(lines),Y:EOR line+1:STA line+1:INY
     LDA(lines),Y:EOR line+2:STA line+2:INY
@@ -546,10 +616,40 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     LDA(lines),Y:EOR line+5:STA line+5:INY
     LDA(lines),Y:EOR line+6:STA line+6:INY
     LDA(lines),Y:EOR line+7:STA line+7:INY
+ENDIF
     DEX:BPL loopC:RTS
     .nosurf TYA:ADC#7:TAY
     DEX:BPL loopC:RTS
 }
+
+IF WIREFRAME
+.drawlines
+    LDA#0:STA lhs+1
+    LDA nlines:STA lhs
+    .loop
+    LSR line+7
+    ROR line+6
+    ROR line+5
+    ROR line+4
+    ROR line+3
+    ROR line+2
+    ROR line+1
+    ROR line
+    BCC noline
+    LDY lhs+1
+    .linestarts LDA &8000,Y:PHA
+    .lineends LDA &8000,Y:TAX
+    JSR getcoordinates
+    STA x0:STY y0
+    PLA:TAX
+    JSR getcoordinates
+    STA x1:STY y1
+    JSR linedraw
+    .noline INC lhs+1:DEC lhs:BPL loop
+    RTS
+
+ELSE
+
 .drawlines
 
     LDA#0:STA lhs+1
@@ -584,7 +684,7 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     ROR line
     INC lhs+1:DEC lhs:BPL loopD
     RTS
-
+ENDIF
 
 .back 
 {
@@ -629,15 +729,17 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     RTS
 }
 
+; De-serialise vertex data (vertices & surfaces)
 ; Pass A=npts, X/Y=points array
+TEMP_ADDR = &7000
 .fix_verts
 {
     sta npts
     stx adr+0
     sty adr+1
-    lda #&00
+    lda #LO(TEMP_ADDR)
     sta odr+0
-    lda #&70
+    lda #HI(TEMP_ADDR)
     sta odr+1
     
     ; *3
@@ -765,7 +867,6 @@ CUBE_SCALE = 1
 MD_HEADER CUBE_NPTS,CUBE_NLINES,CUBE_NSURFS,CUBE_MAXVIS
 
 .verts_data_cube
-IF TRUE
 MD_POINT +50,+50,+50, CUBE_SCALE
 MD_POINT +50,+50,-50, CUBE_SCALE
 MD_POINT +50,-50,+50, CUBE_SCALE
@@ -774,26 +875,15 @@ MD_POINT -50,+50,+50, CUBE_SCALE
 MD_POINT -50,+50,-50, CUBE_SCALE
 MD_POINT -50,-50,+50, CUBE_SCALE
 MD_POINT -50,-50,-50, CUBE_SCALE
-ELSE
 
-EQUB +50+128,+50+128,+50+128,+50+128,-50+128,-50+128,-50+128,-50+128
-EQUB +50+128,+50+128,-50+128,-50+128,+50+128,+50+128,-50+128,-50+128
-EQUB +50+128,-50+128,+50+128,-50+128,+50+128,-50+128,+50+128,-50+128
-ENDIF
 
 .surfs_data_cube
-IF TRUE
 MD_SURF 4,6,0
 MD_SURF 5,7,4
 MD_SURF 1,4,0
 MD_SURF 3,1,0
 MD_SURF 3,2,6
 MD_SURF 7,1,3
-ELSE
-EQUB 4,5,1,3,3,7
-EQUB 6,7,4,1,2,1
-EQUB 0,4,0,0,6,3
-ENDIF
 
 MD_OPP 5
 MD_OPP 3
@@ -802,12 +892,21 @@ MD_OPP 1
 MD_OPP 2
 MD_OPP 0
 
-MD_LINE 0,&150001
-MD_LINE 0,&022820
-MD_LINE 0,&0000FF
-MD_LINE 0,&880208
-MD_LINE 0,&F0F000
-MD_LINE 0,&004540
+IF WIREFRAME
+    MD_LINE 0,&701
+    MD_LINE 0,&164
+    MD_LINE 0,&00F
+    MD_LINE 0,&A12
+    MD_LINE 0,&CC0
+    MD_LINE 0,&0B8
+ELSE
+    MD_LINE 0,&150001
+    MD_LINE 0,&022820
+    MD_LINE 0,&0000FF
+    MD_LINE 0,&880208
+    MD_LINE 0,&F0F000
+    MD_LINE 0,&004540
+ENDIF
 
 MD_INDEX 0,1
 MD_INDEX 4,1
@@ -867,13 +966,23 @@ MD_OPP &80
 MD_OPP 0
 MD_OPP &80
 
-MD_LINE &01,&40010000
-MD_LINE &0A,&00000082
-MD_LINE &00,&C000C033
-MD_LINE &80,&00002028
-MD_LINE &3C,&0000030C
-MD_LINE &50,&00000400
-MD_LINE &00,&3FFFFFC0
+IF WIREFRAME
+    MD_LINE 0,&18100
+    MD_LINE 0,&30009
+    MD_LINE 0,&08085
+    MD_LINE 0,&80046
+    MD_LINE 0,&60012
+    MD_LINE 0,&C0020
+    MD_LINE 0,&07FF8
+ELSE
+    MD_LINE &01,&40010000
+    MD_LINE &0A,&00000082
+    MD_LINE &00,&C000C033
+    MD_LINE &80,&00002028
+    MD_LINE &3C,&0000030C
+    MD_LINE &50,&00000400
+    MD_LINE &00,&3FFFFFC0
+ENDIF
 
 MD_INDEX 0,2
 MD_INDEX 0,3
@@ -959,19 +1068,35 @@ MD_OPP &80
 MD_OPP &80
 MD_OPP &80
 
-MD_LINE 0,&15
-MD_LINE 0,&02A0
-MD_LINE 0,&4500
-MD_LINE &08,&00200800
-MD_LINE 0,&03F000
-MD_LINE &20,&00A00000
-MD_LINE 0,&01410000
-MD_LINE 0,&2A000000
-MD_LINE &01,&50000000
-MD_LINE &C00000C3,&0C000000
-MD_LINE &A0000200,&00002000
-MD_LINE &30000C00,&000000C3
-MD_LINE &0FFFFFFC,&C000000C
+IF WIREFRAME
+    MD_LINE 0,&00000007
+    MD_LINE 0,&0000001C
+    MD_LINE 0,&000000B0
+    MD_LINE 0,&00020420
+    MD_LINE 0,&000003C0
+    MD_LINE 0,&00040C00
+    MD_LINE 0,&00001900
+    MD_LINE 0,&00007000
+    MD_LINE 0,&0001C000
+    MD_LINE 0,&80092000
+    MD_LINE 0,&C0100240
+    MD_LINE 0,&40200009
+    MD_LINE 0,&3FFE8002
+ELSE
+    MD_LINE 0,&15
+    MD_LINE 0,&02A0
+    MD_LINE 0,&4500
+    MD_LINE &08,&00200800
+    MD_LINE 0,&03F000
+    MD_LINE &20,&00A00000
+    MD_LINE 0,&01410000
+    MD_LINE 0,&2A000000
+    MD_LINE &01,&50000000
+    MD_LINE &C00000C3,&0C000000
+    MD_LINE &A0000200,&00002000
+    MD_LINE &30000C00,&000000C3
+    MD_LINE &0FFFFFFC,&C000000C
+ENDIF
 
 MD_INDEX 0,0
 MD_INDEX 1,1
