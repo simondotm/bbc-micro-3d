@@ -9,7 +9,8 @@ ELSE
     linedraw=&2F28
 ENDIF
 
-
+; 3x3 rotation matrix
+; 16-bit unit vectors
 m00lsb=0:m00msb=9
 m01lsb=1:m01msb=&A
 m02lsb=2:m02msb=&B
@@ -28,10 +29,12 @@ zr=&1E
 
 product=&20
 
+; 8-bit rotation angles
 rx=&22
 ry=&23
 rz=&24
 
+; model data
 npts=&30
 nlines=&31
 nsurfs=&32
@@ -78,47 +81,53 @@ GUARD lineroutine
 .start
 
 
-MACRO FNperspective
-d=&100
-oz=&80
-FOR Z%, -128, 127
-EQUB &FF*d/(d+oz+Z%)+.5
-NEXT 
-ENDMACRO
 
 
-MACRO FNsintab
-FOR A%, 0, &13F
-S% = &1FA0 * SIN( A%*2*PI /256 )+.5
-EQUB LO(S%)
-NEXT
-FOR A%, 0, &13F
-S% = &1FA0 * SIN( A%*2*PI /256 )+.5
-EQUB HI(S%)
-NEXT
-ENDMACRO
+; screen space 3D perspective projection table
+.perspective 
+    d=&100
+    oz=&80
+    FOR Z%, -128, 127
+        EQUB &FF*d/(d+oz+Z%)+.5
+    NEXT 
 
+; transformed vertex buffers (max 64 verts per model)
 
+; array of bytes to indicate if vertex has been transformed
+; 0=untransformed, 255=transformed 
+.ptsdone SKIP &40
 
+; screen space vertex coordinates
+.sx SKIP &40
+.sy SKIP &40
 
-
-
-.perspective FNperspective
-.ptsdone SKIP &40 ;EQUS STRING$(&40," ")
-.sx SKIP &40 ;EQUS STRING$(&40," ")
-.sy SKIP &40 ;EQUS STRING$(&40," ")
-
-.slsb FNsintab
+; sin/cos lookup table
+; 256 x 16-bit entries
+; 256+64 bytes lsb
+; 256+64 bytes msb
+; cos is offset by 64 bytes (90 degrees)
+.slsb 
 ; cos table offsets
 clsb=slsb+&40
 smsb=slsb+&140
 cmsb=clsb+&140
 
+; 1fa0 = 8096, curious choice of fixed point scale?
+; used as multiplication table lookup key (clever!)
+    FOR A%, 0, &13F
+        S% = &1FA0 * SIN( A%*2*PI /256 )+.5
+        EQUB LO(S%)
+    NEXT
+    FOR A%, 0, &13F
+        S% = &1FA0 * SIN( A%*2*PI /256 )+.5
+        EQUB HI(S%)
+    NEXT
 
-.bits EQUD &08040201:EQUD &80402010
-EQUD 0:EQUD 0
-EQUD 0:EQUD 0
-EQUD &08040201:EQUD &80402010
+
+.bits   EQUD &08040201:EQUD &80402010
+        EQUD 0:EQUD 0
+        EQUD 0:EQUD 0
+        EQUD &08040201:EQUD &80402010
 
 .vdus
 IF WIREFRAME
@@ -132,7 +141,7 @@ ENDIF
 
 .entry
 {
-
+    ; initialise variables & screen mode
     LDX#0
     STX adr
     STX space:STX p:STX f:STX flicker
@@ -142,13 +151,17 @@ ENDIF
     INX:BNE loop
     .nomess
 
-    JSR load_models
+    JSR initialise_models
 
+    ; disable interrupts & NMI
     SEI:LDA#&40:STA &D00:LDX#&FF:TXS
 
+    ; initialise rotation angles of model
     LDA#0:STA rx
     LDA#&7B:STA ry
     LDA#&C3:STA rz
+
+    ; setup multiplication tables
     CLC
     LDA#&F:STA lmul0+1:STA rmul0+1
     LDA#&12:STA lmul1+1:STA rmul1+1
@@ -166,7 +179,9 @@ ENDIF
     LDA &F01,Y:STA &E00,X
     LDA &1201,Y:STA &1100,X
     DEY:INX:BNE loop3
-    JSR back
+
+    ; load first model
+    JSR reset_model
 
 IF WIREFRAME
     LDA#&58:STA scrstrt
@@ -174,15 +189,22 @@ ELSE
     LDA#&35:STA scrstrt
 ENDIF
 
+    ; main loop
     .frame
+
+    ; check for space bar pressed
     LDA#&81:LDX#&9D:LDY#&FF:JSR &FFF4
     TYA:BEQ nopress:LDA space:BNE nopress
-    JSR modify:LDA#1
+    JSR load_next_model:LDA#1
     .nopress STA space
 
+
 IF WIREFRAME
+    ; wireframe mode uses a double buffer
     LDA scrstrt:LSRA:LSRA:LSRA
     LDX#&C:STX &FE00:STA &FE01
+
+    ; check for "F" keypress to toggle vsync
     LDA#&81:LDX#&BC:LDY#&FF:JSR &FFF4
     TYA:BEQ nof:LDA f:BNE nof
     LDA flicker:EOR #1:STA flicker:LDA#1
@@ -193,48 +215,44 @@ IF WIREFRAME
     LDA scrstrt:EOR #&68:STA scrstrt
 ENDIF
 
+    ; clear the draw buffer
     JSR wipe
+
+    ; check for "P" pressed to pause rotation
     LDA#&81:LDX#&C8:LDY#&FF:JSR &FFF4
     TYA:BEQ nop:LDA p:BNE nop
     LDA pause:EOR #1:STA pause:LDA#1
     .nop STA p
     LDA pause:BEQ nrot
+
+    ; rotate the model
     JSR rotate
 IF WIREFRAME == FALSE    
     JSR rotate
 ENDIF
+
     .nrot
 
-
+    ; compute rotation matrix
     JSR matrix
+
+    ; project points to screen space
     JSR newpoints
+
+    ; eliminate hidden surfaces
     JSR hiddensurfaceremoval
     JSR hiddenlineremoval
+
+    ; render the model
     JSR drawlines
+
+    ; shading
 IF WIREFRAME == FALSE
     JSR fill
 ENDIF
 
     JMP frame
 
-}
-
-
-.rotate
-{
-    INC rx
-    INC ry:INC ry
-    INC rz:INC rz:INC rz
-    RTS
-}
-
-.newpoints
-{
-    LDA#0:LDX npts
-    .loop4
-    STA ptsdone,X
-    DEX:BPL loop4
-    RTS
 }
 
 IF WIREFRAME
@@ -310,6 +328,32 @@ ELSE
 
 ENDIF
 
+
+
+; apply some rotation to the model
+; xyz(1,2,3)
+.rotate
+{
+    INC rx
+    INC ry:INC ry
+    INC rz:INC rz:INC rz
+    RTS
+}
+
+; clear the transformed vertex buffer array
+; ptsdone contains 0 if vertex has not yet been transformed
+; or 255 if vertex has been transformed
+.newpoints
+{
+    LDA#0:LDX npts
+    .loop4
+    STA ptsdone,X
+    DEX:BPL loop4
+    RTS
+}
+
+; table of addresses pointing to each address in the transform
+; routine that is modified to point to the multiplication lookup table
 .unitvectors
 EQUB u00 AND &FF:EQUB u01 AND &FF:EQUB u02 AND &FF
 EQUB u10 AND &FF:EQUB u11 AND &FF:EQUB u12 AND &FF
@@ -318,6 +362,11 @@ EQUB u00 DIV 256:EQUB u01 DIV 256:EQUB u02 DIV 256
 EQUB u10 DIV 256:EQUB u11 DIV 256:EQUB u12 DIV 256
 EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
 
+; fetch the screen space transformed vertex
+; input - X=vertex id to fetch
+; output - A is screen space X coord, Y is screen space Y coord
+; transforms any vertices that have not yet been transformed
+; it will only transform a given vertex once
 .getcoordinates
 {
     LDA ptsdone,X:BPL transform
@@ -326,8 +375,14 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     RTS
 }
 
+; Apply 3D projection transform to vertex
+; input - X is vertex index (0-npts)
+; uses table lookups for all multiplies for speed
 .transform
     LDA#&FF:STA ptsdone,X
+
+    ; fetch & transform vertex X coord
+    ; (vertex buffer address set by load_next_model)
     .x LDY &8000,X
     SEC:.u00
     LDA &E00,Y:SBC &E00,Y:STA xr
@@ -338,6 +393,9 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     SEC:.u20
     LDA &E00,Y:SBC &E00,Y:STA zr
     LDA &1100,Y:SBC &1100,Y:STA zr+1
+
+    ; fetch & transform vertex Y coord
+    ; (vertex buffer address set by load_next_model)    
     .y LDY &8000,X
     SEC:.u01
     LDA &E00,Y:SBC &E00,Y:STA product
@@ -354,6 +412,9 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     LDA &1100,Y:SBC &1100,Y:STA product+1
     LDA product:CLC:ADC zr:STA zr
     LDA product+1:ADC zr+1:STA zr+1
+
+    ; fetch & transform vertex Z coord
+    ; (vertex buffer address set by load_next_model)    
     .z LDY &8000,X
     SEC:.u02
     LDA &E00,Y:SBC &E00,Y:STA product
@@ -370,26 +431,38 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     LDA &1100,Y:SBC &1100,Y:STA product+1
     LDA product:CLC:ADC zr:STA zr
     LDA product+1:ADC zr+1
+
+    ; apply perspective correction
     ASL zr:ROLA:ASL zr
     ADC#&80:TAY:CLC
     LDA#&80:ADC perspective,Y:STA adr:STA adr+2
     LDA#&E:ADC#0:STA adr+1:ADC#3:STA adr+3
     LDA adr:ADC#1:STA adr+4:STA adr+6
     LDA adr+1:ADC#0:STA adr+5:ADC#3:STA adr+7
+
+    ; compute screen space Y coord
     LDA yr+1:ASL yr:ROLA:ASL yr
     ADC#&80:TAY:SEC:EOR #&FF:STY zr:STA zr+1
     LDA(adr),Y:LDY zr+1:SBC(adr+4),Y:STA yr
     LDY zr:LDA(adr+2),Y:LDY zr+1:SBC(adr+6),Y
     ASL yr:ADC#&80:STA sy,X
+
+    ; compute screen space X coord
     LDA xr+1:ASL xr:ROLA:ASL xr
     ADC#&80:TAY:SEC:EOR #&FF:STY zr:STA zr+1
     LDA(adr),Y:LDY zr+1:SBC(adr+4),Y:STA xr
     LDY zr:LDA(adr+2),Y:LDY zr+1:SBC(adr+6),Y
     ASL xr:ADC#&80:STA sx,X
+
     LDY sy,X
+    ; A contains screen space X coord
+    ; Y contains screen space Y coord
     RTS
 
-
+; construct a 3D XYZ rotation matrix 
+; inputs - rx,ry,rz contain rotation angles
+; outputs - updates the transform routine with the
+;           computed matrix coefficients
 .matrix
 {
     LDY rx:SEC
@@ -464,18 +537,37 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     LDA cmsb,X:ADC m20msb:STA m20msb:SEC
     LDA m01lsb:SBC clsb,X:STA m01lsb
     LDA m01msb:SBC cmsb,X:STA m01msb
+
+    ; transfer the computed rotation matrix coefficients directly
+    ; into the vertex transform routine
     LDX#8
     .loop7
+    ; fetch the transform routine coefficient address
+    ; for each element of the 3x3 matrix that is accessed
     LDA unitvectors,X:STA adr
     LDA unitvectors+9,X:STA adr+1
+
+    ; get the high byte of the cooefficent
+    ; complement with high bit of low byte and negate(?)
     LDA m00msb,X:ASL m00lsb,X:ADC#&80
+    
+    ; store in unitvector 
+    ; (+1 is lsb after LDA instruction)
+    ; (+9 is lsb after SBC instruction)
     LDY#1:STA(adr),Y:LDY#9:STA(adr),Y
-    CLC:EOR #&FF:ADC#1
+    
+    ; two's complement negate
+    CLC:EOR #&FF:ADC#1    
+    ; store in unitvector 
+    ; (+4 is lsb after second LDA instruction)
+    ; (+12 is lsb after second SBC instruction)
     LDY#4:STA(adr),Y:LDY#&C:STA(adr),Y
+    
     DEX:BPL loop7
     RTS
 }
 
+; perform hidden surface removal
 .hiddensurfaceremoval
 
     LDA#0:STA visible
@@ -650,6 +742,7 @@ IF WIREFRAME
 
 ELSE
 
+
 .drawlines
 
     LDA#0:STA lhs+1
@@ -666,6 +759,7 @@ ELSE
     STA x1:STY y1
     PLA:TAX:JSR linedraw
     .noline
+    
     LSR line+7
     ROR line+6
     ROR line+5
@@ -686,37 +780,50 @@ ELSE
     RTS
 ENDIF
 
-.back 
+.reset_model 
 {
     LDA#coordinates AND &FF:STA odr
     LDA#coordinates DIV 256:STA odr+1
+
 }
-.modify
+.load_next_model
 {
     LDA#&FF:STA oldsurfs:STA oldsurfs+1
+
     LDY#0
-    LDA(odr),Y:BMI back:STA npts:INY
+    LDA(odr),Y:BMI reset_model:STA npts:INY
     LDA(odr),Y:STA nlines:INY
     LDA(odr),Y:STA nsurfs:INY
     LDA(odr),Y:STA maxvis
+
+    ; setup transform routine to load vertices from this model
     LDA odr:SEC:ADC#3:STA odr:STA x+1
     LDA odr+1:ADC#0:STA odr+1:STA x+2
     LDA odr:SEC:ADC npts:STA odr:STA y+1
     LDA odr+1:ADC#0:STA odr+1:STA y+2
     LDA odr:SEC:ADC npts:STA odr:STA z+1
     LDA odr+1:ADC#0:STA odr+1:STA z+2
+
+    ; setup clockwisetest routine to load 
     LDA odr:SEC:ADC npts:STA odr:STA clock0+1
     LDA odr+1:ADC#0:STA odr+1:STA clock0+2
     LDA odr:SEC:ADC nsurfs:STA odr:STA clock1+1
     LDA odr+1:ADC#0:STA odr+1:STA clock1+2
     LDA odr:SEC:ADC nsurfs:STA odr:STA clock2+1
     LDA odr+1:ADC#0:STA odr+1:STA clock2+2
+
+    ; setup hiddensurfaceremoval routine to load opposites from this model
     LDA odr:SEC:ADC nsurfs:STA odr:STA opposite0+1:STA opposite1+1:STA opposite2+1:STA opposite3+1
     LDA odr+1:ADC#0:STA odr+1:STA opposite0+2:STA opposite1+2:STA opposite2+2:STA opposite3+2
+
+    ; setup lines to point to the lines array for this model
     LDA odr:SEC:ADC nsurfs:STA odr
     LDA odr+1:ADC#0:STA odr+1
     LDA odr:SEC:ADC nsurfs:STA odr:STA lines
     LDA odr+1:ADC#0:STA odr+1:STA lines+1
+    
+    ; setup the drawlines routine to point to the vertex indices
+    ; for this model
     LDY#7
     .loopE
     LDA odr:SEC:ADC nsurfs:STA odr
@@ -800,7 +907,7 @@ MACRO FIX_MODEL    model_data, vert_data, surfs_data
     jsr fix_verts    
 ENDMACRO
 
-.load_models
+.initialise_models
 {
     FIX_MODEL   model_data_cube, verts_data_cube, surfs_data_cube
     FIX_MODEL   model_data_viper, verts_data_viper, surfs_data_viper
