@@ -10,70 +10,10 @@
     ],
     "tasks": [
         {
-            "taskName": "3d.ssd",
-            "problemMatcher": {
-                "owner": "6502",
-                "fileLocation": [
-                    "relative",
-                    "${workspaceRoot}"
-                ],
-                "pattern": {
-                    "regexp": "^(.*):(\\d+):\\s+(warning|error):\\s+(.*)$",
-                    "file": 1,
-                    "line": 2,
-                    "severity": 3,
-                    "message": 4
-                }
-            },
-            "args": [
-                "BeebAsm.exe -v -i 3d.asm -do 3d.ssd -opt 3"
-            ]
-        },
-        {
-            "taskName": "Run 'demo.ssd' in Emulator",
+            "taskName": "Run 'source.ssd' in Emulator",
             "isTestCommand": true,
             "args": [
-                "BeebEm.exe demo.ssd"
-            ]
-        },
-        {
-            "taskName": "3dsolid.ssd",
-            "problemMatcher": {
-                "owner": "6502",
-                "fileLocation": [
-                    "relative",
-                    "${workspaceRoot}"
-                ],
-                "pattern": {
-                    "regexp": "^(.*):(\\d+):\\s+(warning|error):\\s+(.*)$",
-                    "file": 1,
-                    "line": 2,
-                    "severity": 3,
-                    "message": 4
-                }
-            },
-            "args": [
-                "BeebAsm.exe -v -i 3dsolid.asm -do 3dsolid.ssd -opt 3"
-            ]
-        },
-        {
-            "taskName": "filler.ssd",
-            "problemMatcher": {
-                "owner": "6502",
-                "fileLocation": [
-                    "relative",
-                    "${workspaceRoot}"
-                ],
-                "pattern": {
-                    "regexp": "^(.*):(\\d+):\\s+(warning|error):\\s+(.*)$",
-                    "file": 1,
-                    "line": 2,
-                    "severity": 3,
-                    "message": 4
-                }
-            },
-            "args": [
-                "BeebAsm.exe -v -i filler.asm -do filler.ssd -opt 3"
+                "BeebEm.exe source.ssd"
             ]
         },
         {
@@ -94,6 +34,26 @@
             },
             "args": [
                 "BeebAsm.exe -v -i demo.asm -do demo.ssd -boot Main"
+            ]
+        },
+        {
+            "taskName": "source.ssd",
+            "problemMatcher": {
+                "owner": "6502",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceRoot}"
+                ],
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            },
+            "args": [
+                "BeebAsm.exe -v -i source.asm -do source.ssd -opt 3"
             ],
             "isBuildCommand": true
         }
