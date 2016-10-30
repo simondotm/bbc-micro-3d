@@ -13,12 +13,26 @@ WIREFRAME = TRUE
 ;  table1 = n*n/4, where n=0..510
 ;  table2 = (n-255)*(n-255)/4, where n=0..510
 ;
-; table2 + table1 must be contiguous in memory and page aligned
+; table2 + table1 origins must be page aligned
 
-SQUARETABLE2_LSB = &0E00
-SQUARETABLE1_LSB = SQUARETABLE2_LSB+256
-SQUARETABLE2_MSB = SQUARETABLE1_LSB+512
-SQUARETABLE1_MSB = SQUARETABLE2_MSB+256
+CONTIGUOUS_TABLES = FALSE
+
+IF CONTIGUOUS_TABLES
+; specify contiguous tables
+    SQUARETABLE2_LSB = &0E00
+    SQUARETABLE1_LSB = SQUARETABLE2_LSB+256
+    SQUARETABLE2_MSB = SQUARETABLE1_LSB+512
+    SQUARETABLE1_MSB = SQUARETABLE2_MSB+256
+ELSE
+; msb & lsb tables can be in different memory locations
+; enables us to move the program org down a bit
+; as we can spread the two 768 bytes tables around the memory map 
+    SQUARETABLE2_LSB = &0E00
+    SQUARETABLE1_LSB = SQUARETABLE2_LSB+256
+
+    SQUARETABLE2_MSB = &0900 ;&1100
+    SQUARETABLE1_MSB = SQUARETABLE2_MSB+256
+ENDIF
 
 
 ;----------------------------------------------------------------------------------------------------------
@@ -109,10 +123,15 @@ c=&7C
 ; Code
 ;----------------------------------------------------------------------------------------------------------
 
-
+IF CONTIGUOUS_TABLES
 
 ORG &1400
 
+ELSE
+
+ORG &1100
+
+ENDIF
 
 .start
 
@@ -319,9 +338,6 @@ ENDIF
 
     ; rotate the model
     JSR rotate
-IF WIREFRAME == FALSE    
-    JSR rotate
-ENDIF
 
     .nrot
 
@@ -704,13 +720,26 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     CLC   
     LDA#&80:ADC perspective,Y:STA adr:STA adr+2
 
-;    LDA#&E:ADC#0:STA adr+1:ADC#3:STA adr+3
+IF CONTIGUOUS_TABLES
+    ; This routine assumes the square tables are contiguous in memory
     LDA#HI(SQUARETABLE2_LSB):ADC#0:STA adr+1
     ADC#3:STA adr+3 ; SQUARETABLE2_MSB
-
+    CLC
     LDA adr:ADC#1:STA adr+4:STA adr+6
+    CLC
     LDA adr+1:ADC#0:STA adr+5
     ADC#3:STA adr+7 ; SQUARETABLE2_MSB
+ELSE
+    LDA #0:ADC#0:STA adr+1:STA adr+3
+    LDA adr:ADC#1:STA adr+4:STA adr+6
+    LDA adr+1:ADC#0:STA adr+5:STA adr+7
+
+    LDA#HI(SQUARETABLE2_LSB):CLC:ADC adr+1:STA adr+1
+    LDA#HI(SQUARETABLE2_MSB):CLC:ADC adr+3:STA adr+3
+    LDA#HI(SQUARETABLE2_LSB):CLC:ADC adr+5:STA adr+5
+    LDA#HI(SQUARETABLE2_MSB):CLC:ADC adr+7:STA adr+7
+ENDIF
+
 
     ; compute screen space Y coord
     LDA yr+1:ASL yr:ROL A:ASL yr
@@ -1673,6 +1702,7 @@ INCLUDE "include/models.asm"
 PRINT "Coordinates data size is ", coordinates_end-coordinates_start, " bytes"
 PRINT " Trig table data size is ", trigtable_end-trigtable_start, " bytes"
 PRINT "Code from", ~start, "to", ~end, ", size is", (end-start), "bytes"
+
 ; Finish up with executable last on the disk
 SAVE "Main", start, end, entry
 
