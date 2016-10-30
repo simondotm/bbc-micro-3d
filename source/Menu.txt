@@ -1,0 +1,10 @@
+   10MODE7
+   20*KEY 10 CH."MENU"|M
+   30PRINTCHR$(131)+"Please select:"
+   40PRINT'CHR$(133)+"1.3D rotation"'CHR$(133)+"2.3D filled"'CHR$(133)+"3.Polyhedron"'CHR$(133)+"4.Filler"
+   50G$=GET$
+   60IFG$="1"THENCLS:PAGE=&3000:CHAIN"3D"
+   70IFG$="2"THENCLS:PAGE=&3500:CHAIN"3DSolid"
+   80IFG$="3"THENCLS:PAGE=&3000:CHAIN"Polyhed"
+   81IFG$="4"THENCLS:PAGE=&3000:CHAIN"Filler"
+   90GOTO50

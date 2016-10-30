@@ -1,0 +1,688 @@
+   10 REM RUN WITH PAGE=&3500
+   20 MODE 7
+   30 PROCassemble
+   40 IF P%>&2F03PRINT "Out of memory":END 
+   50 CALL start
+   60 DEF PROCassemble
+   70 *LOAD Line5 2F03
+   80 *TAPE
+   90 linedraw=&2F28
+  100 m00lsb=0:m00msb=9
+  110 m01lsb=1:m01msb=&A
+  120 m02lsb=2:m02msb=&B
+  130 m10lsb=3:m10msb=&C
+  140 m11lsb=4:m11msb=&D
+  150 m12lsb=5:m12msb=&E
+  160 m20lsb=6:m20msb=&F
+  170 m21lsb=7:m21msb=&10
+  180 m22lsb=8:m22msb=&11
+  190 adr=&12
+  200 xr=&1A
+  210 yr=&1C
+  220 zr=&1E
+  230 product=&20
+  240 rx=&22
+  250 ry=&23
+  260 rz=&24
+  270 npts=&30
+  280 nlines=&31
+  290 nsurfs=&32
+  300 maxvis=&33
+  310 lhs=&40
+  320 rhs=&42
+  330 lmul0=&44
+  340 lmul1=&46
+  350 rmul0=&48
+  360 rmul1=&4A
+  370 surfs=&50
+  380 oldsurfs=&52
+  390 surfsdone=&54
+  400 visible=&56
+  410 lines=&57
+  420 line=&59
+  430 odr=&61
+  440 space=&63
+  450 p=&64
+  460 pause=&67
+  470 x0=&70:y0=&71
+  480 x1=&72:y1=&73
+  490 scr=&74
+  500 err=&76
+  510 errs=&77
+  520 cnt=&78
+  530 ls=&79
+  540 dx=&FF
+  550 dy=&7A
+  560 scrstrt=&7B
+  570 c=&7C
+  580 FOR pass=0TO 3STEP 3
+  590 P%=&1400
+  600 [OPTpass
+  610 .perspective OPT FNperspective
+  620 .ptsdone EQUS STRING$(&40," ")
+  630 .sx EQUS STRING$(&40," ")
+  640 .sy EQUS STRING$(&40," ")
+  650 .slsb OPT FNsintab
+  660 .bits EQUD&08040201:EQUD&80402010
+  670 EQUD0:EQUD0
+  680 EQUD0:EQUD0
+  690 EQUD&08040201:EQUD&80402010
+  700 .vdus
+  710 EQUD&170516:EQUD&200A
+  720 EQUD0:EQUB&FF
+  730 .start
+  740 LDX#0:STXspace:STXp
+  750 LDA#1:STApause
+  760 .loop
+  770 LDAvdus,X:BMInomess:JSR&FFEE
+  780 INX:BNEloop
+  790 .nomess
+  800 SEI:LDA#&40:STA&D00:LDX#&FF:TXS
+  810 LDA#0:STArx
+  820 LDA#&7B:STAry
+  830 LDA#&C3:STArz
+  840 CLC
+  850 LDA#&F:STAlmul0+1:STArmul0+1
+  860 LDA#&12:STAlmul1+1:STArmul1+1
+  870 LDA#0:TAX:TAY
+  880 STXlhs:STYlhs+1:BCCgo
+  890 .loop
+  900 TXA:ADClhs:STAlhs:STA(lmul0),Y
+  910 LDA#0:ADClhs+1:STAlhs+1:STA(lmul1),Y
+  920 INX:.go STYlmul0:STYlmul1
+  930 TXA:ADClhs:STAlhs:STA(lmul0),Y
+  940 LDA#0:ADClhs+1:STAlhs+1:STA(lmul1),Y
+  950 INY:BNEloop
+  960 LDX#0:LDY#&FF
+  970 .loop
+  980 LDA&F01,Y:STA&E00,X
+  990 LDA&1201,Y:STA&1100,X
+ 1000 DEY:INX:BNEloop
+ 1010 JSRback
+ 1020 LDA#&35:STAscrstrt
+ 1030 .frame
+ 1040 LDA#&81:LDX#&9D:LDY#&FF:JSR&FFF4
+ 1050 TYA:BEQnopress:LDAspace:BNEnopress
+ 1060 JSRmodify:LDA#1
+ 1070 .nopress STAspace
+ 1080 JSRwipe
+ 1090 LDA#&81:LDX#&C8:LDY#&FF:JSR&FFF4
+ 1100 TYA:BEQnop:LDAp:BNEnop
+ 1110 LDApause:EOR #1:STApause:LDA#1
+ 1120 .nop STAp
+ 1130 LDApause:BEQnrot
+ 1140 JSRrotate:JSRrotate
+ 1150 .nrot
+ 1160 JSRmatrix
+ 1170 JSRnewpoints
+ 1180 JSRhiddensurfaceremoval
+ 1190 JSRhiddenlineremoval
+ 1200 JSRdrawlines
+ 1210 JSRfill
+ 1220 JMPframe
+ 1230 .rotate
+ 1240 INCrx
+ 1250 INCry:INCry
+ 1260 INCrz:INCrz:INCrz
+ 1270 RTS
+ 1280 .newpoints
+ 1290 LDA#0:LDXnpts
+ 1300 .loop
+ 1310 STAptsdone,X
+ 1320 DEX:BPLloop
+ 1330 RTS
+ 1340 .wipe LDA#0:LDX#&2F
+ 1350 .loop
+ 1360 ]FOR Y%=&3A40 TO &5700 STEP &140
+ 1370 FOR X%=Y%TO Y%+144STEP 48
+ 1380 [OPTpass:STAX%,X:]NEXT ,
+ 1390 [OPTpass:DEX:BMIwiped:JMPloop
+ 1400 .wiped RTS
+ 1410 .fill SEC:LDX#&B8
+ 1420 .loop
+ 1430 LDA&3A40,X
+ 1440 EOR &3A41,X:STA&5D41,X
+ 1450 EOR &3A42,X:STA&5D42,X
+ 1460 EOR &3A43,X:STA&5D43,X
+ 1470 EOR &3A44,X:STA&5D44,X
+ 1480 EOR &3A45,X:STA&5D45,X
+ 1490 EOR &3A46,X:STA&5D46,X
+ 1500 EOR &3A47,X:STA&5D47,X
+ 1510 ]
+ 1520 FOR A%=&5E80 TO &7A00 STEP &140
+ 1530 [OPTpass
+ 1540 EOR A%-&2300,X:STAA%,X
+ 1550 EOR A%-&22FF,X:STAA%+1,X
+ 1560 EOR A%-&22FE,X:STAA%+2,X
+ 1570 EOR A%-&22FD,X:STAA%+3,X
+ 1580 EOR A%-&22FC,X:STAA%+4,X
+ 1590 EOR A%-&22FB,X:STAA%+5,X
+ 1600 EOR A%-&22FA,X:STAA%+6,X
+ 1610 EOR A%-&22F9,X:STAA%+7,X
+ 1620 ]NEXT 
+ 1630 [OPTpass
+ 1640 TXA:SBC#8:BCCfilled:TAX:JMPloop
+ 1650 .filled RTS
+ 1660 .unitvectors
+ 1670 EQUBu00 AND &FF:EQUBu01 AND &FF:EQUBu02 AND &FF
+ 1680 EQUBu10 AND &FF:EQUBu11 AND &FF:EQUBu12 AND &FF
+ 1690 EQUBu20 AND &FF:EQUBu21 AND &FF:EQUBu22 AND &FF
+ 1700 EQUBu00 DIV 256:EQUBu01 DIV 256:EQUBu02 DIV 256
+ 1710 EQUBu10 DIV 256:EQUBu11 DIV 256:EQUBu12 DIV 256
+ 1720 EQUBu20 DIV 256:EQUBu21 DIV 256:EQUBu22 DIV 256
+ 1730 .getcoordinates
+ 1740 LDAptsdone,X:BPLtransform
+ 1750 LDAsx,X
+ 1760 LDYsy,X
+ 1770 RTS
+ 1780 .transform
+ 1790 LDA#&FF:STAptsdone,X
+ 1800 .x LDY&8000,X
+ 1810 SEC:.u00
+ 1820 LDA&E00,Y:SBC&E00,Y:STAxr
+ 1830 LDA&1100,Y:SBC&1100,Y:STAxr+1
+ 1840 SEC:.u10
+ 1850 LDA&E00,Y:SBC&E00,Y:STAyr
+ 1860 LDA&1100,Y:SBC&1100,Y:STAyr+1
+ 1870 SEC:.u20
+ 1880 LDA&E00,Y:SBC&E00,Y:STAzr
+ 1890 LDA&1100,Y:SBC&1100,Y:STAzr+1
+ 1900 .y LDY&8000,X
+ 1910 SEC:.u01
+ 1920 LDA&E00,Y:SBC&E00,Y:STAproduct
+ 1930 LDA&1100,Y:SBC&1100,Y:STAproduct+1
+ 1940 LDAproduct:CLC:ADCxr:STAxr
+ 1950 LDAproduct+1:ADCxr+1:STAxr+1
+ 1960 SEC:.u11
+ 1970 LDA&E00,Y:SBC&E00,Y:STAproduct
+ 1980 LDA&1100,Y:SBC&1100,Y:STAproduct+1
+ 1990 LDAproduct:CLC:ADCyr:STAyr
+ 2000 LDAproduct+1:ADCyr+1:STAyr+1
+ 2010 SEC:.u21
+ 2020 LDA&E00,Y:SBC&E00,Y:STAproduct
+ 2030 LDA&1100,Y:SBC&1100,Y:STAproduct+1
+ 2040 LDAproduct:CLC:ADCzr:STAzr
+ 2050 LDAproduct+1:ADCzr+1:STAzr+1
+ 2060 .z LDY&8000,X
+ 2070 SEC:.u02
+ 2080 LDA&E00,Y:SBC&E00,Y:STAproduct
+ 2090 LDA&1100,Y:SBC&1100,Y:STAproduct+1
+ 2100 LDAproduct:CLC:ADCxr:STAxr
+ 2110 LDAproduct+1:ADCxr+1:STAxr+1
+ 2120 SEC:.u12
+ 2130 LDA&E00,Y:SBC&E00,Y:STAproduct
+ 2140 LDA&1100,Y:SBC&1100,Y:STAproduct+1
+ 2150 LDAproduct:CLC:ADCyr:STAyr
+ 2160 LDAproduct+1:ADCyr+1:STAyr+1
+ 2170 SEC:.u22
+ 2180 LDA&E00,Y:SBC&E00,Y:STAproduct
+ 2190 LDA&1100,Y:SBC&1100,Y:STAproduct+1
+ 2200 LDAproduct:CLC:ADCzr:STAzr
+ 2210 LDAproduct+1:ADCzr+1
+ 2220 ASLzr:ROLA:ASLzr
+ 2230 ADC#&80:TAY:CLC
+ 2240 LDA#&80:ADCperspective,Y:STAadr:STAadr+2
+ 2250 LDA#&E:ADC#0:STAadr+1:ADC#3:STAadr+3
+ 2260 LDAadr:ADC#1:STAadr+4:STAadr+6
+ 2270 LDAadr+1:ADC#0:STAadr+5:ADC#3:STAadr+7
+ 2280 LDAyr+1:ASLyr:ROLA:ASLyr
+ 2290 ADC#&80:TAY:SEC:EOR #&FF:STYzr:STAzr+1
+ 2300 LDA(adr),Y:LDYzr+1:SBC(adr+4),Y:STAyr
+ 2310 LDYzr:LDA(adr+2),Y:LDYzr+1:SBC(adr+6),Y
+ 2320 ASLyr:ADC#&80:STAsy,X
+ 2330 LDAxr+1:ASLxr:ROLA:ASLxr
+ 2340 ADC#&80:TAY:SEC:EOR #&FF:STYzr:STAzr+1
+ 2350 LDA(adr),Y:LDYzr+1:SBC(adr+4),Y:STAxr
+ 2360 LDYzr:LDA(adr+2),Y:LDYzr+1:SBC(adr+6),Y
+ 2370 ASLxr:ADC#&80:STAsx,X
+ 2380 LDYsy,X
+ 2390 RTS
+ 2400 .matrix
+ 2410 LDYrx:SEC
+ 2420 LDA#0:SBCslsb,Y:STAm12lsb
+ 2430 LDA#0:SBCsmsb,Y:ASLm12lsb
+ 2440 ROLA:ASLm12lsb:ROLA:STAm12msb
+ 2450 TYA:SEC:SBCry
+ 2460 TAX:CLC:ADCrz:STAadr+3
+ 2470 TYA:CLC:ADCry
+ 2480 TAY:CLC:ADCrz:STAadr+2:SEC
+ 2490 LDAslsb,X:SBCslsb,Y:STAm02lsb
+ 2500 LDAsmsb,X:SBCsmsb,Y:ASLm02lsb
+ 2510 ROLA:STAm02msb:CLC
+ 2520 LDAclsb,Y:ADCclsb,X:STAm22lsb
+ 2530 LDAcmsb,Y:ADCcmsb,X:ASLm22lsb
+ 2540 ROLA:STAm22msb
+ 2550 TYA:SEC:SBCrz:STAadr+4
+ 2560 TXA:SEC:SBCrz:STAadr+5
+ 2570 LDArx:CLC:ADCrz:TAY
+ 2580 LDArx:SEC:SBCrz:TAX:SEC
+ 2590 LDAslsb,Y:SBCslsb,X:STAm10lsb
+ 2600 LDAsmsb,Y:SBCsmsb,X:ASLm10lsb
+ 2610 ROLA:STAm10msb:CLC
+ 2620 LDAclsb,X:ADCclsb,Y:STAm11lsb
+ 2630 LDAcmsb,Y:ADCcmsb,X:ASLm11lsb
+ 2640 ROLA:STAm11msb
+ 2650 LDAry:SEC:SBCrz:TAY
+ 2660 LDArz:CLC:ADCry:TAX:SEC
+ 2670 LDAclsb,X:SBCclsb,Y:STAm21lsb
+ 2680 LDAcmsb,X:SBCcmsb,Y:ASLm21lsb
+ 2690 ROLA:STAm21msb:SEC
+ 2700 LDAslsb,Y:SBCslsb,X:STAm01lsb
+ 2710 LDAsmsb,Y:SBCsmsb,X:ASLm01lsb
+ 2720 ROLA:STAm01msb:CLC
+ 2730 LDAclsb,Y:ADCclsb,X:STAm00lsb
+ 2740 LDAcmsb,X:ADCcmsb,Y:ASLm00lsb
+ 2750 ROLA:STAm00msb:CLC
+ 2760 LDAslsb,X:ADCslsb,Y:STAm20lsb
+ 2770 LDAsmsb,Y:ADCsmsb,X:ASLm20lsb
+ 2780 ROLA:STAm20msb
+ 2790 LDYadr+4:LDXadr+3:SEC
+ 2800 LDAm00lsb:SBCslsb,X:STAm00lsb
+ 2810 LDAm00msb:SBCsmsb,X:STAm00msb:CLC
+ 2820 LDAslsb,Y:ADCm21lsb:STAm21lsb
+ 2830 LDAm21msb:ADCsmsb,Y:STAm21msb:CLC
+ 2840 LDAclsb,Y:ADCm20lsb:STAm20lsb
+ 2850 LDAcmsb,Y:ADCm20msb:STAm20msb:SEC
+ 2860 LDAm01lsb:SBCclsb,X:STAm01lsb
+ 2870 LDAm01msb:SBCcmsb,X:STAm01msb:CLC
+ 2880 LDAclsb,Y:ADCm01lsb:STAm01lsb
+ 2890 LDAcmsb,Y:ADCm01msb:STAm01msb:CLC
+ 2900 LDAm21lsb:ADCslsb,X:STAm21lsb
+ 2910 LDAm21msb:ADCsmsb,X:STAm21msb:SEC
+ 2920 LDAm20lsb:SBCclsb,X:STAm20lsb
+ 2930 LDAm20msb:SBCcmsb,X:STAm20msb:SEC
+ 2940 LDAm00lsb:SBCslsb,Y:STAm00lsb
+ 2950 LDAm00msb:SBCsmsb,Y:STAm00msb
+ 2960 LDXadr+5:LDYadr+2:SEC
+ 2970 LDAm20lsb:SBCclsb,Y:STAm20lsb
+ 2980 LDAm20msb:SBCcmsb,Y:STAm20msb:CLC
+ 2990 LDAm00lsb:ADCslsb,X:STAm00lsb
+ 3000 LDAm00msb:ADCsmsb,X:STAm00msb:CLC
+ 3010 LDAm21lsb:ADCslsb,X:STAm21lsb
+ 3020 LDAm21msb:ADCsmsb,X:STAm21msb:CLC
+ 3030 LDAclsb,Y:ADCm01lsb:STAm01lsb
+ 3040 LDAcmsb,Y:ADCm01msb:STAm01msb:CLC
+ 3050 LDAslsb,Y:ADCm21lsb:STAm21lsb
+ 3060 LDAsmsb,Y:ADCm21msb:STAm21msb:CLC
+ 3070 LDAslsb,Y:ADCm00lsb:STAm00lsb
+ 3080 LDAsmsb,Y:ADCm00msb:STAm00msb:CLC
+ 3090 LDAclsb,X:ADCm20lsb:STAm20lsb
+ 3100 LDAcmsb,X:ADCm20msb:STAm20msb:SEC
+ 3110 LDAm01lsb:SBCclsb,X:STAm01lsb
+ 3120 LDAm01msb:SBCcmsb,X:STAm01msb
+ 3130 LDX#8
+ 3140 .loop
+ 3150 LDAunitvectors,X:STAadr
+ 3160 LDAunitvectors+9,X:STAadr+1
+ 3170 LDAm00msb,X:ASLm00lsb,X:ADC#&80
+ 3180 LDY#1:STA(adr),Y:LDY#9:STA(adr),Y
+ 3190 CLC:EOR #&FF:ADC#1
+ 3200 LDY#4:STA(adr),Y:LDY#&C:STA(adr),Y
+ 3210 DEX:BPLloop
+ 3220 RTS
+ 3230 .hiddensurfaceremoval
+ 3240 LDA#0:STAvisible
+ 3250 LDAoldsurfs:EOR #&FF:STAsurfsdone
+ 3260 LDAoldsurfs+1:EOR #&FF:STAsurfsdone+1
+ 3270 LDA#&F:SEC:SBCnsurfs:BEQnloop
+ 3280 TAY:LDAoldsurfs
+ 3290 .loop
+ 3300 ASLA:ROLoldsurfs+1:DEY:BNEloop
+ 3310 STAoldsurfs:.nloop
+ 3320 LDYnsurfs
+ 3330 .loop
+ 3340 ASLoldsurfs:ROLoldsurfs+1
+ 3350 BCShidesurface
+ 3360 JSRclockwisetest:BCShidesurface
+ 3370 TYA:ASLA:TAX
+ 3380 .opposite0 LDA&8000,X:INX
+ 3390 ORAsurfsdone:STAsurfsdone
+ 3400 .opposite1 LDA&8000,X
+ 3410 ORAsurfsdone+1:STAsurfsdone+1
+ 3420 INCvisible
+ 3430 .hidesurface
+ 3440 ROLsurfs:ROLsurfs+1
+ 3450 DEY:BPLloop
+ 3460 LDYnsurfs
+ 3470 LDAbits,Y:STAoldsurfs
+ 3480 LDAbits+16,Y:STAoldsurfs+1
+ 3490 .loop
+ 3500 LDXvisible:CPXmaxvis:BEQdoneit
+ 3510 LDAsurfsdone:AND oldsurfs:BNEsurfdone
+ 3520 LDAsurfsdone+1:AND oldsurfs+1:BNEsurfdone
+ 3530 JSRclockwisetest:BCSsurfdone
+ 3540 LDAoldsurfs:EOR #&FF:AND surfs:STAsurfs
+ 3550 LDAoldsurfs+1:EOR #&FF:AND surfs+1:STAsurfs+1
+ 3560 TYA:ASLA:TAX
+ 3570 .opposite2 LDA&8000,X:INX
+ 3580 ORAsurfsdone:STAsurfsdone
+ 3590 .opposite3 LDA&8000,X
+ 3600 ORAsurfsdone+1:STAsurfsdone+1
+ 3610 INCvisible
+ 3620 .surfdone
+ 3630 LSRoldsurfs+1:RORoldsurfs
+ 3640 DEY:BPLloop
+ 3650 .doneit
+ 3660 LDAsurfs:STAoldsurfs
+ 3670 LDAsurfs+1:STAoldsurfs+1
+ 3680 RTS
+ 3690 .clockwisetest STYls
+ 3700 .clock0 LDX&8000,Y
+ 3710 JSRgetcoordinates
+ 3720 STAx0:STYy0:LDYls
+ 3730 .clock1 LDX&8000,Y
+ 3740 JSRgetcoordinates
+ 3750 STAx1:STYy1:LDYls
+ 3760 .clock2 LDX&8000,Y
+ 3770 JSRgetcoordinates
+ 3780 SEC:LDX#0
+ 3790 SBCx0:BCSx20p
+ 3800 SBC#0:EOR #&FF:INX
+ 3810 .x20p STAlmul0
+ 3820 LDAy1:SBCy0:BCSy10p
+ 3830 SBC#0:EOR #&FF:DEX
+ 3840 .y10p STAlmul1
+ 3850 TYA:LDY#0
+ 3860 SBCy0:BCSy20p
+ 3870 SBC#0:EOR #&FF:INY
+ 3880 .y20p STArmul0
+ 3890 LDAx1:SBCx0:BCSx10p
+ 3900 SBC#0:EOR #&FF:DEY
+ 3910 .x10p STArmul1:STXcnt
+ 3920 CPX#1:TYA
+ 3930 EOR cnt:AND #1:BEQcompare
+ 3940 LDYls:RTS
+ 3950 .compare BCCbothpos
+ 3960 JSRmultiply
+ 3970 LDYlhs:CPYrhs
+ 3980 LDAlhs+1:SBCrhs+1
+ 3990 LDYls:RTS
+ 4000 .bothpos SEC
+ 4010 JSRmultiply
+ 4020 LDYrhs:CPYlhs
+ 4030 LDArhs+1:SBClhs+1
+ 4040 LDYls:RTS
+ 4050 .multiply
+ 4060 LDYlmul1:TYA
+ 4070 LDXlmul0:STXlmul1
+ 4080 SBClmul0:BCSmabsl
+ 4090 SBC#0:EOR #&FF
+ 4100 .mabsl TAX
+ 4110 LDA(lmul0),Y:SBC&F00,X:STAlhs
+ 4120 LDA(lmul1),Y:SBC&1200,X:STAlhs+1
+ 4130 LDYrmul1:TYA
+ 4140 LDXrmul0:STXrmul1
+ 4150 SBCrmul0:BCSmabsr
+ 4160 SBC#0:EOR #&FF
+ 4170 .mabsr TAX
+ 4180 LDA(rmul0),Y:SBC&F00,X:STArhs
+ 4190 LDA(rmul1),Y:SBC&1200,X:STArhs+1
+ 4200 RTS
+ 4210 .hiddenlineremoval
+ 4220 LDXnsurfs:LDY#0
+ 4230 STYline
+ 4240 STYline+1
+ 4250 STYline+2
+ 4260 STYline+3
+ 4270 STYline+4
+ 4280 STYline+5
+ 4290 STYline+6
+ 4300 STYline+7
+ 4310 .loop
+ 4320 LSRsurfs+1:RORsurfs:BCSnosurf
+ 4330 LDA(lines),Y:EOR line:STAline:INY
+ 4340 LDA(lines),Y:EOR line+1:STAline+1:INY
+ 4350 LDA(lines),Y:EOR line+2:STAline+2:INY
+ 4360 LDA(lines),Y:EOR line+3:STAline+3:INY
+ 4370 LDA(lines),Y:EOR line+4:STAline+4:INY
+ 4380 LDA(lines),Y:EOR line+5:STAline+5:INY
+ 4390 LDA(lines),Y:EOR line+6:STAline+6:INY
+ 4400 LDA(lines),Y:EOR line+7:STAline+7:INY
+ 4410 DEX:BPLloop:RTS
+ 4420 .nosurf TYA:ADC#7:TAY
+ 4430 DEX:BPLloop:RTS
+ 4440 .drawlines
+ 4450 LDA#0:STAlhs+1
+ 4460 LDAnlines:STAlhs
+ 4470 .loop
+ 4480 LDAline:AND #3:BEQnoline:PHA
+ 4490 LDYlhs+1
+ 4500 .linestarts LDA&8000,Y:PHA
+ 4510 .lineends LDA&8000,Y:TAX
+ 4520 JSRgetcoordinates
+ 4530 STAx0:STYy0
+ 4540 PLA:TAX
+ 4550 JSRgetcoordinates
+ 4560 STAx1:STYy1
+ 4570 PLA:TAX:JSRlinedraw
+ 4580 .noline
+ 4590 LSRline+7
+ 4600 RORline+6
+ 4610 RORline+5
+ 4620 RORline+4
+ 4630 RORline+3
+ 4640 RORline+2
+ 4650 RORline+1
+ 4660 RORline
+ 4670 LSRline+7
+ 4680 RORline+6
+ 4690 RORline+5
+ 4700 RORline+4
+ 4710 RORline+3
+ 4720 RORline+2
+ 4730 RORline+1
+ 4740 RORline
+ 4750 INClhs+1:DEClhs:BPLloop
+ 4760 RTS
+ 4770 .back LDA#coordinates AND &FF:STAodr
+ 4780 LDA#coordinates DIV 256:STAodr+1
+ 4790 .modify
+ 4800 LDA#&FF:STAoldsurfs:STAoldsurfs+1
+ 4810 LDY#0
+ 4820 LDA(odr),Y:BMIback:STAnpts:INY
+ 4830 LDA(odr),Y:STAnlines:INY
+ 4840 LDA(odr),Y:STAnsurfs:INY
+ 4850 LDA(odr),Y:STAmaxvis
+ 4860 LDAodr:SEC:ADC#3:STAodr:STAx+1
+ 4870 LDAodr+1:ADC#0:STAodr+1:STAx+2
+ 4880 LDAodr:SEC:ADCnpts:STAodr:STAy+1
+ 4890 LDAodr+1:ADC#0:STAodr+1:STAy+2
+ 4900 LDAodr:SEC:ADCnpts:STAodr:STAz+1
+ 4910 LDAodr+1:ADC#0:STAodr+1:STAz+2
+ 4920 LDAodr:SEC:ADCnpts:STAodr:STAclock0+1
+ 4930 LDAodr+1:ADC#0:STAodr+1:STAclock0+2
+ 4940 LDAodr:SEC:ADCnsurfs:STAodr:STAclock1+1
+ 4950 LDAodr+1:ADC#0:STAodr+1:STAclock1+2
+ 4960 LDAodr:SEC:ADCnsurfs:STAodr:STAclock2+1
+ 4970 LDAodr+1:ADC#0:STAodr+1:STAclock2+2
+ 4980 LDAodr:SEC:ADCnsurfs:STAodr:STAopposite0+1:STAopposite1+1:STAopposite2+1:STAopposite3+1
+ 4990 LDAodr+1:ADC#0:STAodr+1:STAopposite0+2:STAopposite1+2:STAopposite2+2:STAopposite3+2
+ 5000 LDAodr:SEC:ADCnsurfs:STAodr
+ 5010 LDAodr+1:ADC#0:STAodr+1
+ 5020 LDAodr:SEC:ADCnsurfs:STAodr:STAlines
+ 5030 LDAodr+1:ADC#0:STAodr+1:STAlines+1
+ 5040 LDY#7
+ 5050 .loop
+ 5060 LDAodr:SEC:ADCnsurfs:STAodr
+ 5070 LDAodr+1:ADC#0:STAodr+1
+ 5080 DEY:BPLloop
+ 5090 LDAodr:STAlinestarts+1:SEC:ADCnlines:STAodr:STAlineends+1
+ 5100 LDAodr+1:STAlinestarts+2:ADC#0:STAodr+1:STAlineends+2
+ 5110 LDAodr:SEC:ADCnlines:STAodr
+ 5120 LDAodr+1:ADC#0:STAodr+1
+ 5130 RTS
+ 5140 .coordinates OPT FNreaddata
+ 5150 ]
+ 5160 clsb=slsb+&40
+ 5170 smsb=slsb+&140
+ 5180 cmsb=clsb+&140
+ 5190 NEXT 
+ 5200 ENDPROC 
+ 5210 DEF FNperspective
+ 5220 IF pass<2P%=P%+&100:=pass
+ 5230 d=&100
+ 5240 oz=&80
+ 5250 FOR Z%=-128TO 127
+ 5260 ?P%=&FF*d/(d+oz+Z%)+.5
+ 5270 P%=P%+1
+ 5280 NEXT 
+ 5290 =pass
+ 5300 DEF FNsintab
+ 5310 IF pass<2P%=P%+&280:=pass
+ 5320 FOR A%=0TO &13F
+ 5330 S%=&1FA0*SIN (A%*2*PI /256)+.5
+ 5340 ?P%=S%AND &FF
+ 5350 P%?&140=(S%AND &FF00)DIV 256
+ 5360 P%=P%+1
+ 5370 NEXT 
+ 5380 P%=P%+&140
+ 5390 =pass
+ 5400 DEF FNreaddata
+ 5410 RESTORE 5840 
+ 5420 READ NPTS%:IF NPTS%=&FF ?P%=&FF:P%=P%+1:=pass
+ 5430 READ NLINES%,NSURFS%,MAXVIS%,SCALE%
+ 5440 ?P%=NPTS%-1:P%=P%+1
+ 5450 ?P%=NLINES%-1:P%=P%+1
+ 5460 ?P%=NSURFS%-1:P%=P%+1
+ 5470 ?P%=MAXVIS%:P%=P%+1
+ 5480 FOR I%=1TO NPTS%
+ 5490 READ X%,Y%,Z%
+ 5500 ?P%=SCALE%*X%+128
+ 5510 ?(P%+NPTS%)=SCALE%*Y%+128
+ 5520 ?(P%+2*NPTS%)=SCALE%*Z%+128
+ 5530 P%=P%+1
+ 5540 NEXT 
+ 5550 P%=P%+2*NPTS%
+ 5560 FOR I%=1TO NSURFS%
+ 5570 READ C1%,C2%,C3%
+ 5580 ?P%=C1%
+ 5590 ?(P%+NSURFS%)=C2%
+ 5600 ?(P%+2*NSURFS%)=C3%
+ 5610 P%=P%+1
+ 5620 NEXT 
+ 5630 P%=P%+2*NSURFS%
+ 5640 FOR I%=1TO NSURFS%
+ 5650 READ OPPS%
+ 5660 IF OPPS%>&7FS%=0ELSE S%=2^OPPS%
+ 5670 ?P%=S%AND &FF
+ 5680 ?(P%+1)=S%DIV 256
+ 5690 P%=P%+2
+ 5700 NEXT 
+ 5710 FOR I%=1TO NSURFS%
+ 5720 READ LIN1%,LIN2%
+ 5730 !P%=LIN2%
+ 5740 !(P%+4)=LIN1%
+ 5750 P%=P%+8
+ 5760 NEXT 
+ 5770 FOR I%=1TO 2*NLINES%
+ 5780 READ PT%
+ 5790 ?P%=PT%
+ 5800 P%=P%+1
+ 5810 NEXT 
+ 5820 GOTO 5420 
+ 5830 REM Cube data
+ 5840 DATA 8,12,6,3
+ 5850 DATA 1
+ 5860 DATA +50,+50,+50
+ 5870 DATA +50,+50,-50
+ 5880 DATA +50,-50,+50
+ 5890 DATA +50,-50,-50
+ 5900 DATA -50,+50,+50
+ 5910 DATA -50,+50,-50
+ 5920 DATA -50,-50,+50
+ 5930 DATA -50,-50,-50
+ 5940 DATA 4,6,0
+ 5950 DATA 5,7,4
+ 5960 DATA 1,4,0
+ 5970 DATA 3,1,0
+ 5980 DATA 3,2,6
+ 5990 DATA 7,1,3
+ 6000 DATA 5,3,4,1,2,0
+ 6010 DATA 0,&150001
+ 6020 DATA 0,&022820
+ 6030 DATA 0,&0000FF
+ 6040 DATA 0,&880208
+ 6050 DATA 0,&F0F000
+ 6060 DATA 0,&004540
+ 6070 DATA 0,1,4,1,1,5,6,3,4,0,2,2
+ 6080 DATA 4,0,5,5,3,7,7,7,6,2,6,3
+ 6090 REM Viper data
+ 6100 DATA 15,20,7,5
+ 6110 DATA 4
+ 6120 DATA 0,19,0,0,1,-6
+ 6130 DATA 0,1,6,-10,-19,-6
+ 6140 DATA -19,-19,0,-10,-19,6
+ 6150 DATA 10,-19,6,19,-19,0
+ 6160 DATA 10,-19,-6,-3,-19,-4
+ 6170 DATA -12,-19,0,-3,-19,4
+ 6180 DATA 3,-19,-4,3,-19,4
+ 6190 DATA 12,-19,0
+ 6200 DATA 1,8,3
+ 6210 DATA 0,1,3
+ 6220 DATA 0,8,1
+ 6230 DATA 0,2,6
+ 6240 DATA 0,5,2
+ 6250 DATA 2,5,6
+ 6260 DATA 6,3,8
+ 6270 DATA 5,&80,&80,&80,&80,0,&80
+ 6280 DATA &01,&40010000
+ 6290 DATA &0A,&00000082
+ 6300 DATA &00,&C000C033
+ 6310 DATA &80,&00002028
+ 6320 DATA &3C,&0000030C
+ 6330 DATA &50,&00000400
+ 6340 DATA &00,&3FFFFFC0
+ 6350 DATA 0,2,0,3,4,5,6,7,8,9,10
+ 6360 DATA 11,12,13,14,1,3,0,5,2
+ 6370 DATA 1,0,7,4,5,6,7,8,3,10,11
+ 6380 DATA 9,13,14,12,8,1,4,2,6
+ 6390 REM Cobra MkIII data
+ 6400 DATA 22,32,13,9
+ 6410 DATA 6
+ 6420 DATA -19,-8,0,-19,-4.5,0
+ 6430 DATA -16,-8,-1,-5,9,0
+ 6440 DATA -5,-8,2,5,-8,2
+ 6450 DATA 0,3,-3.5,0,9,0
+ 6460 DATA 0,12,0,5,9,0
+ 6470 DATA 0,-8,-2,16,-8,-1
+ 6480 DATA 19,-4.5,0,19,-8,0
+ 6490 DATA -5,-8,-1,-2,-8,-1
+ 6500 DATA -2,-8,1.5,-5,-8,1
+ 6510 DATA 2,-8,-1,5,-8,-1
+ 6520 DATA 5,-8,1,2,-8,1.5
+ 6530 DATA 0,1,2
+ 6540 DATA 1,3,2
+ 6550 DATA 2,3,6
+ 6560 DATA 2,6,10
+ 6570 DATA 3,9,6
+ 6580 DATA 10,6,11
+ 6590 DATA 6,9,11
+ 6600 DATA 11,9,12
+ 6610 DATA 11,12,13
+ 6620 DATA 13,9,5
+ 6630 DATA 5,3,4
+ 6640 DATA 4,3,0
+ 6650 DATA 4,10,5
+ 6660 DATA &80,&80,&80,&80,&80,&80,&80,&80,&80,&80,&80,&80,&80
+ 6670 DATA 0,&15
+ 6680 DATA 0,&02A0
+ 6690 DATA 0,&4500
+ 6700 DATA &08,&00200800
+ 6710 DATA 0,&03F000
+ 6720 DATA &20,&00A00000
+ 6730 DATA 0,&01410000
+ 6740 DATA 0,&2A000000
+ 6750 DATA &01,&50000000
+ 6760 DATA &C00000C3,&0C000000
+ 6770 DATA &A0000200,&00002000
+ 6780 DATA &30000C00,&000000C3
+ 6790 DATA &0FFFFFFC,&C000000C
+ 6800 DATA 0,0,1,1,2,2,3,3
+ 6810 DATA 6,7,10,6,9,9,11,11
+ 6820 DATA 12,2,11,5,4,0,14,15
+ 6830 DATA 16,14,18,19,20,18,3,5
+ 6840 DATA 1,2,2,3,3,6,9,6
+ 6850 DATA 9,8,6,11,11,12,12,13
+ 6860 DATA 13,10,10,13,5,4,15,16
+ 6870 DATA 17,17,19,20,21,21,4,9
+ 6880 DATA &FF
