@@ -1,18 +1,5 @@
 
-;----------------------------------------------------------------------------------------------------------
-; surface index to 16-bit bitmask
-; lookup table
-;----------------------------------------------------------------------------------------------------------
-; used by hiddensurfaceremoval routine to convert a surface id to a bitfield for use with surfs array
-; supports maximum 16 surfaces
-.bits   
-        ; lsb table for surface ID[0-7]
-        EQUB 1,2,4,8,16,32,64,128
-        EQUD 0:EQUD 0
-        ; msb table for surface ID[8-15]
-        EQUD 0:EQUD 0
-        EQUB 1,2,4,8,16,32,64,128
-        
+
 ;----------------------------------------------------------------------------------------------------------
 ; perform hidden surface removal for the current model
 ;----------------------------------------------------------------------------------------------------------
@@ -459,3 +446,24 @@ ENDIF
     DEX:BPL loopC
     RTS
 }
+
+
+
+;----------------------------------------------------------------------------------------------------------
+; surface index to 16-bit bitmask
+; lookup table
+;----------------------------------------------------------------------------------------------------------
+
+; used by hiddensurfaceremoval routine to convert a surface id to a bitfield for use with surfs array
+; supports maximum 16 surfaces
+
+; SM: could ALIGN 32 this table to ensure no page boundary cycle hits, but might waste a few bytes and not sure its worth the memory/speed tradeoff.
+.bits   
+        ; lsb table for surface ID[0-7]
+        EQUB 1,2,4,8,16,32,64,128
+        EQUD 0:EQUD 0
+        ; msb table for surface ID[8-15]
+        EQUD 0:EQUD 0
+        EQUB 1,2,4,8,16,32,64,128
+
+    

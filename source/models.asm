@@ -250,6 +250,7 @@ MACRO MD_LINE   p0, p1
     EQUD    p0
 ENDMACRO
 
+
 ; add a line to the linelist for the model
 ; where p0 and p1 are the two vertex indices for the line
 MACRO MD_INDEX  p0, p1
@@ -370,7 +371,7 @@ MD_INDEX 6,2
 MD_INDEX 6,3
 
 ; wireframe only models
-IF WIREFRAME
+IF TRUE ;WIREFRAME
 ; Octahedron data
 .model_data_octa
 

@@ -36,6 +36,8 @@ IF WIREFRAME
 }
 
 ELSE
+
+
 .wipe 
 {
     LDA#0:LDX#&2F
@@ -50,6 +52,8 @@ ELSE
     RTS
 }
 
+
+; xor fill the back buffer to the front buffer
 .fill
 { 
     SEC:LDX#&B8
@@ -75,9 +79,23 @@ ELSE
         EOR A%-&22F9,X:STAA%+7,X
 
     NEXT 
-
     TXA:SBC#8:BCC filled:TAX:JMP loop6
     .filled 
+    RTS
+}
+
+; copy the back buffer to the front buffer
+.fill_copy
+{
+    LDA#0:LDX#&2F
+    .loop5
+    FOR Y%, &3A40, &5700, &140
+        FOR X%, Y%, Y%+144, 48
+           LDA X%,X:STA X%+(&5D40-&3A40),X
+        NEXT
+    NEXT
+    DEX:BMI wiped:JMP loop5
+    .wiped 
     RTS
 }
 
