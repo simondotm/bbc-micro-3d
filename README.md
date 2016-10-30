@@ -15,7 +15,17 @@ To achieve this high performance, Nick had incorporated a number of very innovat
 
 This led to an annotated version of the code being ported to BeebAsm for the benefit of the 6502/BBC Micro development community, and so here it is.
 
-# Contents
+# Screenshots
+
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/wireframe1.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/wireframe2.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/wireframe3.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/wireframe4.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/wireframe5.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/wireframe6.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/filled1.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/filled2.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/filled3.png" width="128" >
 
 
 
