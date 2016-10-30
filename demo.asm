@@ -403,23 +403,59 @@ ELSE
 ENDIF
 
 ;----------------------------------------------------------------------------------------------------------
-; setup multiplication tables
+; setup quarter square multiplication tables
+;----------------------------------------------------------------------------------------------------------
+; f(x) = x^2 / 4. Then a*b = f(a+b) - f(a-b) 
+;
+; This implementation uses two tables of squares:
+;  table1 = n*n/4, where n=0..510
+;  table2 = (n-255)*(n-255)/4, where n=0..510
+;  
+; Unsigned multiplication of two 8-bit terms is computed as:
+;  r = table1[a+b] - table2[(a EOR 255)+b]
+; where r is a 16-bit unsigned result
+;----------------------------------------------------------------------------------------------------------
+; A clever innovation with this code is that it takes advantage of overlaps in the table
+;  which means the tables fit into 1536 bytes instead of the usual 2048. 
+;
+; &0E00-&0FFF = table2 lsb
+; &0F00-&10FF = table1 lsb
+; &1100-&12FF = table2 msb
+; &1200-&13FF = table1 msb 
 ;----------------------------------------------------------------------------------------------------------
 .initialise_multiply
 {
-    ; setup multiplication tables
-    ; 0F00-0FFF = x*x lsb
-    ; 1200-12FF = x*x msb
 
-    ; 0E00-0EFF = (255-x)*(255-x) lsb
-    ; 1100-11FF = (255-x)*(255-x) msb
-    CLC
-
+    ; set the msb of lmul0, lmul1, rmul0 and rmul1 just once
+    ;  for the entire lifecycle of the application
+    ;  - the lsb of these 16-bit addresses will be set as the multiplication terms
     LDA#&F:STA lmul0+1:STA rmul0+1
     LDA#&12:STA lmul1+1:STA rmul1+1
+
+    ; compute table1
     
+    ; x=y=lhs=0
+    ; while y<256:
+    ;     if y>0:
+    ;         lhs += x
+    ;         table1[offset+y] = lhs
+    ;         x = x + 1
+    ;
+    ;     lhs += x
+    ;     offset = y
+    ;     table1[offset+y] = lhs    
+    ;     y = y + 1
+
+    ; effectively the same as:
+    ; for n in range(0,511):  # 0-510
+    ;     table1[n] = n*n/4
+
+    ; initialise counters and indices    
     LDA#0:TAX:TAY
     STX lhs:STY lhs+1
+
+    ; skip increment on first iteration
+    CLC
     BCC go
 
     .loop2
@@ -434,7 +470,15 @@ ENDIF
     INY
     BNE loop2
 
+    ; compute table2
 
+    ; for x in range(0,256):
+    ;     table2[x] = table1[255-x]
+    ;     table2[x+256] = table1[x+1]    
+    ;
+    ; effectively the same as:
+    ; for n in range(0,511):  # 0-510
+    ;     table2[n] = (n-255)*(n-255)/4
 
 
     LDX#0:LDY#&FF
