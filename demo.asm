@@ -74,6 +74,8 @@ p=&64
 f=&65
 flicker=&66
 pause=&67
+culling=&68     ; culling = 0=disabled, 255=enabled
+cullingdb=&69   ; culling key debounce
 
 ; line rendering coordinates, start and end
 x0=&70:y0=&71
@@ -220,11 +222,14 @@ ENDIF
 
 .entry
 {
-    ; initialise variables & screen mode
+    ; initialise variables
     LDX#0
     STX adr
-    STX space:STX p:STX f:STX flicker
+    STX space:STX p:STX f:STX flicker:STX cullingdb
     LDA#1:STA pause
+    LDA#255:STA culling
+
+    ; initialise display
     .loop
     LDA vdus,X:BMI nomess:JSR &FFEE
     INX:BNE loop
@@ -285,6 +290,13 @@ ENDIF
     ; clear the draw buffer
     JSR wipe
 
+    ; check for "C" pressed to toggle backface culling
+    LDA#&81:LDX#&AD:LDY#&FF:JSR &FFF4
+    TYA:BEQ noc:LDA cullingdb:BNE noc
+    LDA culling:EOR #255:STA culling:LDA#1
+    .noc STA cullingdb
+
+
     ; check for "P" pressed to pause rotation
     LDA#&81:LDX#&C8:LDY#&FF:JSR &FFF4
     TYA:BEQ nop:LDA p:BNE nop
@@ -306,11 +318,20 @@ ENDIF
     ; clear transformed vertex buffer
     JSR newpoints
 
+    ; initialise visibility of lines array for this frame
+    JSR resetvisibility
+
+    ; check if back face culling is enabled, skip if not
+    LDA culling
+    BEQ noculling
+
     ; eliminate hidden surfaces
     JSR hiddensurfaceremoval
 
     ; determine visible lines to be rendered
     JSR hiddenlineremoval
+
+.noculling
 
     ; render the model
     JSR drawlines
@@ -1247,6 +1268,31 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
 }
 
 ;----------------------------------------------------------------------------------------------------------
+; Initialise the line visibility array based on culling preference
+;----------------------------------------------------------------------------------------------------------
+.resetvisibility
+{
+   ; use culling value to reset the lines array
+    ; if culling is on, they are reset to zero (and line visibility set to surface visibiity)
+    ; if culling is off, they are all set to 255 (and line visibility is forced)
+    LDA culling
+    EOR #&FF
+    TAY
+    
+    ; reset the 64-bit line visibility array 
+    STY line
+    STY line+1
+    STY line+2
+    STY line+3
+    STY line+4
+    STY line+5
+    STY line+6
+    STY line+7
+
+    RTS
+}
+
+;----------------------------------------------------------------------------------------------------------
 ; Determine the minimum set of lines to be rendered for the current model based on currently visible surfaces
 ;----------------------------------------------------------------------------------------------------------
 ; inputs - 
@@ -1265,20 +1311,9 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
 
 .hiddenlineremoval
 {
-    
+    LDY #0
+
     LDX nsurfs
-    
-    LDY#0
-    
-    ; reset all 64 lines to be zero (non-visible)
-    STY line
-    STY line+1
-    STY line+2
-    STY line+3
-    STY line+4
-    STY line+5
-    STY line+6
-    STY line+7
 
     ; for y=0; y<nsurfs; ++y
     ;   if visible
