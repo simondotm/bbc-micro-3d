@@ -468,10 +468,10 @@ ENDIF
 ; A clever innovation with this code is that it takes advantage of overlaps in the table
 ;  which means the tables fit into 1536 bytes instead of the usual 2048. 
 ;
-; &0E00-&0FFF = table2 lsb
-; &0F00-&10FF = table1 lsb
-; &1100-&12FF = table2 msb
-; &1200-&13FF = table1 msb 
+; &0000-&01FF = table2 lsb
+; &0100-&02FF = table1 lsb
+; &0300-&04FF = table2 msb
+; &0400-&05FF = table1 msb 
 ;----------------------------------------------------------------------------------------------------------
 .initialise_multiply
 {
