@@ -1,13 +1,25 @@
 ;----------------------------------------------------------------------------------------------------------
-; 3D Object Rotation Demo
+; Fast 3D Rendering Demo
 ; 6502/BBC Micro
 ;----------------------------------------------------------------------------------------------------------
 ;
-; Original 1994 code - by Nick Jameson
+; Original 1994 code written by Nick Jameson
 ; Ported to BeebAsm & Annotated - by https://github.com/simondotm
 ;----------------------------------------------------------------------------------------------------------
 
 WIREFRAME = TRUE
+
+; quarter square lookup tables
+;  table1 = n*n/4, where n=0..510
+;  table2 = (n-255)*(n-255)/4, where n=0..510
+;
+; table2 + table1 must be contiguous in memory and page aligned
+
+SQUARETABLE2_LSB = &0E00
+SQUARETABLE1_LSB = SQUARETABLE2_LSB+256
+SQUARETABLE2_MSB = SQUARETABLE1_LSB+512
+SQUARETABLE1_MSB = SQUARETABLE2_MSB+256
+
 
 ;----------------------------------------------------------------------------------------------------------
 ; Zero Page Vars
@@ -111,7 +123,7 @@ ORG &1400
 ; screen space 3D perspective projection table
 ;----------------------------------------------------------------------------------------------------------
 ; 256 x 8-bit entries. Uses unsigned Z as a table index.
-; [aligned]
+; [page aligned]
 .perspective 
     d=&100
     oz=&80
@@ -153,7 +165,7 @@ ORG &1400
 ;  but since it is really only used to create rotation matrix once per frame, and would need more memory,
 ;  probably not worth it.
 
-
+.trigtable_start
 .slsb 
 smsb=slsb+&140
 ; cos table offsets
@@ -184,6 +196,7 @@ SINCOS_SCALE = 253 << 5 ; = &1fa0, but can be 255 << 5 (&1fe0) as a maximum, giv
         S% = SINCOS_SCALE * SIN( A%*2*PI /256 )+.5
         EQUB HI(S%)
     NEXT
+.trigtable_end
 
 ;----------------------------------------------------------------------------------------------------------
 ; surface index to 16-bit bitmask
@@ -450,8 +463,8 @@ ENDIF
     ; set the msb of lmul0, lmul1, rmul0 and rmul1 just once
     ;  for the entire lifecycle of the application
     ;  - the lsb of these 16-bit addresses will be set as the multiplication terms
-    LDA#&F:STA lmul0+1:STA rmul0+1
-    LDA#&12:STA lmul1+1:STA rmul1+1
+    LDA#HI(SQUARETABLE1_LSB):STA lmul0+1:STA rmul0+1
+    LDA#HI(SQUARETABLE1_MSB):STA lmul1+1:STA rmul1+1
 
     ; compute table1
     
@@ -504,8 +517,8 @@ ENDIF
 
     LDX#0:LDY#&FF
     .loop3
-    LDA &F01,Y:STA &E00,X
-    LDA &1201,Y:STA &1100,X
+    LDA SQUARETABLE1_LSB+1,Y:STA SQUARETABLE2_LSB,X
+    LDA SQUARETABLE1_MSB+1,Y:STA SQUARETABLE2_MSB,X
     DEY:INX:BNE loop3
 
     rts
@@ -616,18 +629,18 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
 
     ; x' = x*a
     SEC:.u00
-    LDA &E00,Y:SBC &E00,Y:STA xr
-    LDA &1100,Y:SBC &1100,Y:STA xr+1
+    LDA SQUARETABLE2_LSB,Y:SBC SQUARETABLE2_LSB,Y:STA xr
+    LDA SQUARETABLE2_MSB,Y:SBC SQUARETABLE2_MSB,Y:STA xr+1
 
     ; y' = x*b
     SEC:.u10
-    LDA &E00,Y:SBC &E00,Y:STA yr
-    LDA &1100,Y:SBC &1100,Y:STA yr+1
+    LDA SQUARETABLE2_LSB,Y:SBC SQUARETABLE2_LSB,Y:STA yr
+    LDA SQUARETABLE2_MSB,Y:SBC SQUARETABLE2_MSB,Y:STA yr+1
 
     ; z' = x*c
     SEC:.u20
-    LDA &E00,Y:SBC &E00,Y:STA zr
-    LDA &1100,Y:SBC &1100,Y:STA zr+1
+    LDA SQUARETABLE2_LSB,Y:SBC SQUARETABLE2_LSB,Y:STA zr
+    LDA SQUARETABLE2_MSB,Y:SBC SQUARETABLE2_MSB,Y:STA zr+1
 
     ; fetch & transform vertex Y coord
     ; (vertex buffer address set by load_next_model)    
@@ -635,22 +648,22 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
 
     ; x' += y*d
     SEC:.u01
-    LDA &E00,Y:SBC &E00,Y:STA product
-    LDA &1100,Y:SBC &1100,Y:STA product+1
+    LDA SQUARETABLE2_LSB,Y:SBC SQUARETABLE2_LSB,Y:STA product
+    LDA SQUARETABLE2_MSB,Y:SBC SQUARETABLE2_MSB,Y:STA product+1
     LDA product:CLC:ADC xr:STA xr
     LDA product+1:ADC xr+1:STA xr+1
 
     ; y' += y*e
     SEC:.u11
-    LDA &E00,Y:SBC &E00,Y:STA product
-    LDA &1100,Y:SBC &1100,Y:STA product+1
+    LDA SQUARETABLE2_LSB,Y:SBC SQUARETABLE2_LSB,Y:STA product
+    LDA SQUARETABLE2_MSB,Y:SBC SQUARETABLE2_MSB,Y:STA product+1
     LDA product:CLC:ADC yr:STA yr
     LDA product+1:ADC yr+1:STA yr+1
 
     ; z' += y*f
     SEC:.u21
-    LDA &E00,Y:SBC &E00,Y:STA product
-    LDA &1100,Y:SBC &1100,Y:STA product+1
+    LDA SQUARETABLE2_LSB,Y:SBC SQUARETABLE2_LSB,Y:STA product
+    LDA SQUARETABLE2_MSB,Y:SBC SQUARETABLE2_MSB,Y:STA product+1
     LDA product:CLC:ADC zr:STA zr
     LDA product+1:ADC zr+1:STA zr+1
 
@@ -660,22 +673,22 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
 
     ; x' += z*g
     SEC:.u02
-    LDA &E00,Y:SBC &E00,Y:STA product
-    LDA &1100,Y:SBC &1100,Y:STA product+1
+    LDA SQUARETABLE2_LSB,Y:SBC SQUARETABLE2_LSB,Y:STA product
+    LDA SQUARETABLE2_MSB,Y:SBC SQUARETABLE2_MSB,Y:STA product+1
     LDA product:CLC:ADC xr:STA xr
     LDA product+1:ADC xr+1:STA xr+1
 
     ; y' += z*h
     SEC:.u12
-    LDA &E00,Y:SBC &E00,Y:STA product
-    LDA &1100,Y:SBC &1100,Y:STA product+1
+    LDA SQUARETABLE2_LSB,Y:SBC SQUARETABLE2_LSB,Y:STA product
+    LDA SQUARETABLE2_MSB,Y:SBC SQUARETABLE2_MSB,Y:STA product+1
     LDA product:CLC:ADC yr:STA yr
     LDA product+1:ADC yr+1:STA yr+1
 
     ; z' += z*i
     SEC:.u22
-    LDA &E00,Y:SBC &E00,Y:STA product
-    LDA &1100,Y:SBC &1100,Y:STA product+1
+    LDA SQUARETABLE2_LSB,Y:SBC SQUARETABLE2_LSB,Y:STA product
+    LDA SQUARETABLE2_MSB,Y:SBC SQUARETABLE2_MSB,Y:STA product+1
     LDA product:CLC:ADC zr:STA zr
     LDA product+1:ADC zr+1
 
@@ -690,9 +703,14 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     
     CLC   
     LDA#&80:ADC perspective,Y:STA adr:STA adr+2
-    LDA#&E:ADC#0:STA adr+1:ADC#3:STA adr+3
+
+;    LDA#&E:ADC#0:STA adr+1:ADC#3:STA adr+3
+    LDA#HI(SQUARETABLE2_LSB):ADC#0:STA adr+1
+    ADC#3:STA adr+3 ; SQUARETABLE2_MSB
+
     LDA adr:ADC#1:STA adr+4:STA adr+6
-    LDA adr+1:ADC#0:STA adr+5:ADC#3:STA adr+7
+    LDA adr+1:ADC#0:STA adr+5
+    ADC#3:STA adr+7 ; SQUARETABLE2_MSB
 
     ; compute screen space Y coord
     LDA yr+1:ASL yr:ROL A:ASL yr
@@ -1191,9 +1209,9 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     
     ; X contains 1,0, or 255 for the x2-x0 and y1-y0 test
     ; Y contains 1,0, or 255 for the y2-y0 and x1-x0 test
-    ; 1 or 255 if just one test was less than the other
-    ; 0 if both tests were less than the other
-    ; 0 if both tests were greater than the other
+    ;  1 or 255 if just one test was less than the other
+    ;  0 if both tests were less than the other
+    ;  0 if both tests were greater than the other
 
     ; compare the results from both tests
     STX cnt
@@ -1254,16 +1272,16 @@ EQUB u20 DIV 256:EQUB u21 DIV 256:EQUB u22 DIV 256
     SBC lmul0:BCS mabsl
     SBC#0:EOR #&FF
     .mabsl TAX
-    LDA(lmul0),Y:SBC &F00,X:STA lhs
-    LDA(lmul1),Y:SBC &1200,X:STA lhs+1
+    LDA(lmul0),Y:SBC SQUARETABLE1_LSB,X:STA lhs
+    LDA(lmul1),Y:SBC SQUARETABLE1_MSB,X:STA lhs+1
 
     LDY rmul1:TYA
     LDX rmul0:STX rmul1
     SBC rmul0:BCS mabsr
     SBC#0:EOR #&FF
     .mabsr TAX
-    LDA(rmul0),Y:SBC &F00,X:STA rhs
-    LDA(rmul1),Y:SBC &1200,X:STA rhs+1
+    LDA(rmul0),Y:SBC SQUARETABLE1_LSB,X:STA rhs
+    LDA(rmul1),Y:SBC SQUARETABLE1_MSB,X:STA rhs+1
     RTS
 }
 
@@ -1462,8 +1480,8 @@ ENDIF
 
 .reset_model 
 {
-    LDA#coordinates AND &FF:STA odr
-    LDA#coordinates DIV 256:STA odr+1
+    LDA#coordinates_start AND &FF:STA odr
+    LDA#coordinates_start DIV 256:STA odr+1
 
 }
 
@@ -1631,7 +1649,7 @@ ENDIF
 IF WIREFRAME
     FIX_MODEL   model_data_octa, verts_data_octa, surfs_data_octa
     FIX_MODEL   model_data_dodeca, verts_data_dodeca, surfs_data_dodeca
-; icosa not compatible with code, as too many surfaces
+; icosa not compatible with code, as it has >15 surfaces
 ;    FIX_MODEL   model_data_icosa, verts_data_icosa, surfs_data_icosa
 ENDIF
 
@@ -1644,7 +1662,7 @@ ENDIF
 ;----------------------------------------------------------------------------------------------------------
 ; start of model data block
 ;----------------------------------------------------------------------------------------------------------
-.coordinates 
+.coordinates_start 
 
 ; models comprise:
 ;   header
@@ -2331,11 +2349,12 @@ MD_INDEX 4,9
 .model_data_finish
 EQUB &FF
 
+.coordinates_end
 
 
 ;----------------------------------------------------------------------------------------------------------
 ; Line rendering routines
-; Good luck figuring these out!! :)
+; Not yet annotated
 ;----------------------------------------------------------------------------------------------------------
 
 
@@ -3086,7 +3105,8 @@ ENDIF
 .end
 
 
-
+PRINT "Coordinates data size is ", coordinates_end-coordinates_start, " bytes"
+PRINT " Trig table data size is ", trigtable_end-trigtable_start, " bytes"
 
 ; Finish up with executable last on the disk
 SAVE "Main", start, end, entry
