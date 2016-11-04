@@ -275,9 +275,14 @@ ENDIF
 IF WIREFRAME == FALSE
     ; apply shading
     LDA opt_filled
-    BEQ nofill
-    JSR fill
-    .nofill
+    BNE dofill
+    JSR fill_copy   ; copy back buffer to front rather than xor fill from back to front
+    JMP filldone
+    
+    .dofill
+    JSR fill        ; xor fill back buffer to front buffer
+
+    .filldone
 ENDIF
 
     JMP frame
@@ -294,7 +299,5 @@ PRINT "Code from", ~start, "to", ~end, ", size is", (end-start), "bytes"
 
 ; Finish up with executable last on the disk
 SAVE "Main", start, end, entry
-
-
 
 
