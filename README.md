@@ -6,6 +6,7 @@ Original source written in 1994 by [Nick Jameson](http://nojameson.net/)
 
 BeebAsm port by [Simon M](https://github.com/simondotm)
 
+Demo version [here](https://bitshifters.github.io/jsbeeb/?disc=https://bitshifters.github.io/content/wip/sd-beeb3d.ssd&autoboot&model=Master)
 
 # Introduction
 
