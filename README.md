@@ -93,14 +93,14 @@ The annotations are just my initial interpretations of the code (and certainly n
 ### Changes from original code
 I had to make a few alterations here and there to get the code compiling in BeebAsm, but overall I tried to keep the code functionality and structure the same. 
 
-- The solid and wireframe demo contain a lot of common code, so both now exist in one project for ease of reference, but they are conditionally compiled with the `WIREFRAME=TRUE/FALSE` variable. I think it would be possible to unify the code to switch between the two modes in one runtime, but would need a lot of memory juggling to achieve that so I left that alone.
+- The solid and wireframe demo contain a lot of common code, so both now exist in one project for ease of reference, but they are conditionally compiled with the `WIREFRAME=TRUE/FALSE` variable. I think it would be possible to unify the code to switch between the two modes in one runtime, but would need a lot of memory juggling and code changes to achieve that so I left that alone!
 - The model data was read into interleaved memory addresses in the BASIC version, but BeebAsm doesn't support random access, so I concocted the various `MD_***` macros to assist with this along with an initialisation routine that de-serialised the model data back to the optimized interleaved format at runtime
 - BeebAsm has many useful functions, one of which is the `INCLUDE` directive, so the code has been broken out into separate source files, again for easier reference
 - The extra rendering options (back face culling toggle and filling toggle) were added
-- The memory locations of the quarter square multiplication tables were changes to variables rather than hard coded, and `CONTIGUOUS_TABLES` was added as a compile option which frees up a bit of extra RAM to enable a couple more models
+- The memory locations of the quarter square multiplication tables were changed to variables rather than hard coded, and `CONTIGUOUS_TABLES` was added as a compile option which frees up a bit of extra RAM to enable a couple more models
 - Some extra models were incorporated from Nick's original wireframe demo, however the Icosahedron model could not be ported as is contains more than 16 surfaces (and Nick's original 'polyhed' demo did not use the optimized hidden surface routines which only allow upto 16 surfaces per model. This could be fixed but would need the code to handle models with >16 surfaces differently
 
-I strongly suspect its possible to unify the code so that theres one runtime and an ability to switch between solid and wireframe mode in realtime, but that would need some more clever tricks since the model data is different between modes, plus memory is very tight. Plus it might obfuscate the code slightly, so left open as an idea for another day!
+
 
 
 
