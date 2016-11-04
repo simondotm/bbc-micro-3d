@@ -10,10 +10,10 @@
     ],
     "tasks": [
         {
-            "taskName": "Run 'source.ssd' in Emulator",
+            "taskName": "Run 'beeb3d.ssd' in Emulator",
             "isTestCommand": true,
             "args": [
-                "BeebEm.exe source.ssd"
+                "BeebEm.exe beeb3d.ssd"
             ]
         },
         {
@@ -37,7 +37,7 @@
             ]
         },
         {
-            "taskName": "source.ssd",
+            "taskName": "beeb3d.ssd",
             "problemMatcher": {
                 "owner": "6502",
                 "fileLocation": [
@@ -53,7 +53,7 @@
                 }
             },
             "args": [
-                "BeebAsm.exe -v -i source.asm -do source.ssd -opt 3"
+                "BeebAsm.exe -i beeb3d_solid.asm|BeebAsm.exe -v -i beeb3d.asm -do beeb3d.ssd -opt 3"
             ],
             "isBuildCommand": true
         }
