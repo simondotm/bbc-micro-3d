@@ -40,18 +40,61 @@ Some of the technical innovations that give the demo it's speed are as follows:
 - Caching of transformed screen space vertices
 - Temporal caching of visible surfaces to minimize number of hidden surface tests
 - Optimized unrolled Bresenham line drawing for 1-bit-per-pixel mode 4
-- Optimized unrolled Bresenham line drawing for 2-bit-per-pixel mode 5, with XOR filling
-- Optimized polygon filling based on XOR scan line buffers
+- Optimized unrolled Bresenham line drawing for 2-bit-per-pixel mode 5, supporting 3 colours and XOR based vertical polygon fill
+- Optimized vertical polygon filling routine
 - Optimal model data format enables only the minimum number of lines to be rendered given a list of visible surfaces
 - Rendering window, to enable double buffering and/or rapid buffer updates
 
 These routines are particularly well optimized for the 8-bit 6502 CPU.
+
 
 # Building the project
 
 Use [BeebAsm](https://github.com/tom-seddon/beebasm) to assemble the code and compile the demo disk SSD file.
 
 There is also a build configuration for Visual Studio Code using the [Beeb VSC](https://marketplace.visualstudio.com/items?itemName=simondotm.beeb-vsc) extension. Hit `CTRL+SHIFT+B` to build, and `CTRL+SHIFT+T` to run in BeebEm.
+
+
+# Running the project
+
+- Press `C` to toggle back face culling
+- Press `P` to pause the rotation
+- Press `SPACE` to cycle through the models
+
+
+- Press `F` in wireframe mode to toggle the vsync
+- Press `L` in solid mode to toggle the Filler
+
+
+# Notes
+
+## Polygon Filler
+
+In solid fill mode, the rendering routines use a custom Bresenham routine to plot only the top most vertical elements of the line. Each line for a surface can be assigned one of three colours, and the object is filled vertically using XOR to transmit a colour from the top of the visible surface to the bottom. You can see in the two images below the cube is first rendered in a special wireframe mode (with only the topmost pixels for any vertical pixel column being drawn), and then the XOR filler works by scanning from top-bottom XORing a pixel with the pixel directly above it, creating the fill effect. This is then repeated from left to right to achieve the filled cube.  
+
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/xor1.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/xor2.png" width="128" >
+
+## BeebAsm port
+
+### Annotations
+The original BBC BASIC source code was ported to BeebAsm and annotated, mainly for learning and understanding the techniques that were making it work. However Nick kindly gave us his permission to share it, so it is now also a way of preserving the code and making it accessible to the BBC Micro development community. 
+
+The annotations are just my initial interpretations of the code (and certainly not exhaustive) so I'm sure there may be places where I've judged the code incorrectly. The line plotting routines have not yet been documented, and some annotations need further work, eg. the 3D rotation matrix, transform and cross product routine needs more work to determine things like XYZ rotation matrix order (lh/rh), winding order of the surfaces, and the exact calculations driving some of the maths. For now though, I'm just gonna commit it "as is" with the intention of coming back to this soon.
+
+### Changes from original code
+I had to make a few alterations here and there to get the code compiling in BeebAsm, but overall I tried to keep the code functionality and structure the same. 
+
+- The solid and wireframe demo contain a lot of common code, so both now exist in one project for ease of reference, but they are conditionally compiled with the `WIREFRAME=TRUE/FALSE` variable. I think it would be possible to unify the code to switch between the two modes in one runtime, but would need a lot of memory juggling to achieve that so I left that alone.
+- The model data was read into interleaved memory addresses in the BASIC version, but BeebAsm doesn't support random access, so I concocted the various `MD_***` macros to assist with this along with an initialisation routine that de-serialised the model data back to the optimized interleaved format at runtime
+- BeebAsm has many useful functions, one of which is the `INCLUDE` directive, so the code has been broken out into separate source files, again for easier reference
+- The extra rendering options (back face culling toggle and filling toggle) were added
+- The memory locations of the quarter square multiplication tables were changes to variables rather than hard code, and `CONTIGUOUS_TABLES` was added as a compile option which frees up a bit of extra RAM to enable a couple more models
+- Some extra models were incorporated from Nick's original wireframe demo, however the Icosahedron model could not be ported as is contains more than 16 surfaces (and Nick's original 'polyhed' demo did not use the optimized hidden surface routines which only allow upto 16 surfaces per model. This could be fixed but would need the code to handle models with >16 surfaces differently
+
+I strongly suspect its possible to unify the code so that theres one runtime and an ability to switch between solid and wireframe mode in realtime, but that would need some more clever tricks since the model data is different between modes, plus memory is very tight. Plus it might obfuscate the code slightly, so left open as an idea for another day!
+
+
 
 
 
