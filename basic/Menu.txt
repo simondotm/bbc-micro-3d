@@ -3,11 +3,18 @@
    25PRINTCHR$(134)+"BBC Micro 3D Graphics Rendering Demo"
    26PRINTCHR$(135)+" Written by Nick Jameson, 1994"
    27PRINTCHR$(135)+" Ported to BeebAsm by Simon M, 2016"
-   30PRINT'CHR$(131)+"Please select:"
-   40PRINT'CHR$(133)+"1.BASIC - 3D rotation"'CHR$(133)+"2.BASIC - 3D filled"'CHR$(133)+"3.BASIC - Polyhedron"'CHR$(133)+"4.BASIC - Filler"
+   30PRINT'CHR$(131)+"Please select:"'
+   40PRINT CHR$(133)+"1.  BeebAsm - 3D wireframe"
+   41PRINT CHR$(133)+"2.  BeebAsm - 3D solid"
+   42PRINT CHR$(133)+"3.BBC BASIC - 3D rotation"
+   43PRINT CHR$(133)+"4.BBC BASIC - 3D filled"
+   44PRINT CHR$(133)+"5.BBC BASIC - Polyhedron"
+   45PRINT CHR$(133)+"6.BBC BASIC - Filler"
    50G$=GET$
-   60IFG$="1"THENCLS:PAGE=&3000:CHAIN"3D"
-   70IFG$="2"THENCLS:PAGE=&3500:CHAIN"3DSolid"
-   80IFG$="3"THENCLS:PAGE=&3000:CHAIN"Polyhed"
-   81IFG$="4"THENCLS:PAGE=&3000:CHAIN"Filler"
+   51IFG$="1"THENCLS:*RUN A.Beeb3D
+   52IFG$="2"THENCLS:*RUN A.Beeb3Ds
+   60IFG$="3"THENCLS:PAGE=&3000:CHAIN"3D"
+   70IFG$="4"THENCLS:PAGE=&3500:CHAIN"3DSolid"
+   80IFG$="5"THENCLS:PAGE=&3000:CHAIN"Polyhed"
+   81IFG$="6"THENCLS:PAGE=&3000:CHAIN"Filler"
    90GOTO50
