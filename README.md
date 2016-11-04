@@ -30,23 +30,6 @@ This led to an annotated version of the code being ported to BeebAsm for the ben
 
 
 
-# Techniques
-
-Some of the technical innovations that give the demo it's speed are as follows:
-- Fast 3D rotation matrix building using compound angle formulae rather than multiplications
-- Fast 3D vertex transform routine, using pre-loaded table look-ups rather than multiplications
-- Table based sin/cos tables, with 16-bit fixed point precision
-- Fast multiplication based on quarter square tables, but overlapped to used 1536 bytes of RAM instead of the usual 2048 bytes
-- Screen space hidden surface removal
-- Caching of transformed screen space vertices
-- Temporal caching of visible surfaces to minimize number of hidden surface tests
-- Optimized unrolled Bresenham line drawing for 1-bit-per-pixel mode 4
-- Optimized unrolled Bresenham line drawing for 2-bit-per-pixel mode 5, supporting 3 colours and XOR based vertical polygon fill
-- Optimized vertical polygon filling routine
-- Optimal model data format enables only the minimum number of lines to be rendered given a list of visible surfaces
-- Rendering window, to enable double buffering and/or rapid buffer updates
-
-These routines are particularly well optimized for the 8-bit 6502 CPU.
 
 
 # Building the project
@@ -76,13 +59,6 @@ If running `beeb3d.ssd` a menu will show, otherwise `demo.ssd` will boot straigh
 
 # Notes
 
-## Polygon Filler
-
-In solid fill mode, the rendering routines use a custom Bresenham routine to plot only the top most vertical elements of the line. Each line for a surface can be assigned one of three colours, and the object is filled vertically using XOR to transmit a colour from the top of the visible surface to the bottom. You can see in the two images below the cube is first rendered in a special wireframe mode (with only the topmost pixels for any vertical pixel column being drawn), and then the XOR filler works by scanning from top-bottom XORing a pixel with the pixel directly above it, creating the fill effect. This is then repeated from left to right to achieve the filled cube.  
-
-<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/xor1.png" width="128" >
-<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/xor2.png" width="128" >
-
 ## BeebAsm port
 
 ### Annotations
@@ -101,6 +77,32 @@ I had to make a few alterations here and there to get the code compiling in Beeb
 - Some extra models were incorporated from Nick's original wireframe demo, however the Icosahedron model could not be ported as is contains more than 16 surfaces (and Nick's original 'polyhed' demo did not use the optimized hidden surface routines which only allow upto 16 surfaces per model. This could be fixed but would need the code to handle models with >16 surfaces differently
 
 
+# Techniques
+
+Some of the technical innovations that give the demo it's speed are as follows:
+- Fast 3D rotation matrix building using compound angle formulae rather than multiplications
+- Fast 3D vertex transform routine, using pre-loaded table look-ups rather than multiplications
+- Table based sin/cos tables, with 16-bit fixed point precision
+- Fast multiplication based on quarter square tables, but overlapped to used 1536 bytes of RAM instead of the usual 2048 bytes
+- Screen space hidden surface removal
+- Caching of transformed screen space vertices
+- Temporal caching of visible surfaces to minimize number of hidden surface tests
+- Optimized unrolled Bresenham line drawing for 1-bit-per-pixel mode 4
+- Optimized unrolled Bresenham line drawing for 2-bit-per-pixel mode 5, supporting 3 colours and XOR based vertical polygon fill
+- Optimized vertical polygon filling routine
+- Optimal model data format enables only the minimum number of lines to be rendered given a list of visible surfaces
+- Rendering window, to enable double buffering and/or rapid buffer updates
+
+These routines are particularly well optimized for the 8-bit 6502 CPU.
+
+## Polygon Filler
+
+In solid fill mode, the rendering routines use a custom Bresenham routine to plot only the top most vertical elements of the line. Each line for a surface can be assigned one of three colours, and the object is filled vertically using XOR to transmit a colour from the top of the visible surface to the bottom. You can see in the two images below the cube is first rendered in a special wireframe mode (with only the topmost pixels for any vertical pixel column being drawn), and then the XOR filler works by scanning from top-bottom XORing a pixel with the pixel directly above it, creating the fill effect. This is then repeated from left to right to achieve the filled cube.  
+
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/xor1.png" width="128" >
+<img src="https://raw.githubusercontent.com/simondotm/bbc-micro-3d/master/images/xor2.png" width="128" >
+
+**TODO** - Add further information here about the various tricks described above
 
 
 
