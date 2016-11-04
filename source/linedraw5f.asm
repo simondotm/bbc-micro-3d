@@ -249,7 +249,14 @@
     JMP p03
 
 
-    .colors EQUD&FFF00FED
+    ; 2bpp mode colour lookup table
+    ; 0 = WWYR - not used, as no lines are rendered in black
+    ; 1 = RRRR
+    ; 2 = YYYY
+    ; 3 = WWWW
+    .colors EQUD&FFF00F00;ED   
+
+
     .strt0
     EQUB a00 AND &FF:EQUB a10 AND &FF
     EQUB a60 AND &FF:EQUB a70 AND &FF

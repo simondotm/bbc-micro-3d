@@ -165,12 +165,14 @@ IF WIREFRAME
 
 ELSE
 
-
+; in fill mode, the line bit array contains 2 bits per line.
+; so a maximum of 32 lines for filled objects. (non filled have 64 lines)
 .drawlines
 
     LDA#0:STA lhs+1
     LDA nlines:STA lhs
     .loopD
+    ; two bits per pixel for each line, to indicate colour. 
     LDA line:AND #3:BEQ noline:PHA
     LDY lhs+1
     .linestarts LDA &8000,Y:PHA
@@ -180,9 +182,10 @@ ELSE
     PLA:TAX
     JSR getcoordinates
     STA x1:STY y1
-    PLA:TAX:JSR linedraw
+    PLA:TAX ; line colour in X
+    JSR linedraw
     .noline
-    
+    ; shift two bits per pixel rather than one
     LSR line+7
     ROR line+6
     ROR line+5

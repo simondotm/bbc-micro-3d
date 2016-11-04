@@ -371,7 +371,7 @@ MD_INDEX 6,2
 MD_INDEX 6,3
 
 ; wireframe only models
-IF TRUE ;WIREFRAME
+IF WIREFRAME
 ; Octahedron data
 .model_data_octa
 
@@ -537,7 +537,7 @@ MD_INDEX 16,17
 MD_INDEX 15,5
 
 ; Icosahedron model contains more than 15 surfaces
-; so cannot be rendered using the optimized surface removal
+; so cannot be rendered using the optimized surface removal, unless that optimization is disabled
 IF FALSE
 
 ; Icosahedron data
