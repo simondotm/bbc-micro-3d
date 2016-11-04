@@ -52,10 +52,17 @@ These routines are particularly well optimized for the 8-bit 6502 CPU.
 
 Use [BeebAsm](https://github.com/tom-seddon/beebasm) to assemble the code and compile the demo disk SSD file.
 
+`BeebAsm.exe -v -i demo.asm -do demo.ssd -boot Main` for standalone testing
+
+`BeebAsm.exe -i beeb3d_solid.asm` then `BeebAsm.exe -v -i beeb3d.asm -do beeb3d.ssd -opt 3` for creating the `beeb3d.ssd` disk
+
 There is also a build configuration for Visual Studio Code using the [Beeb VSC](https://marketplace.visualstudio.com/items?itemName=simondotm.beeb-vsc) extension. Hit `CTRL+SHIFT+B` to build, and `CTRL+SHIFT+T` to run in BeebEm.
 
+If using BeebVSC, two build targets exist - `demo.ssd` and `beeb3d.asm`
 
 # Running the project
+
+If running `beeb3d.ssd` a menu will show, otherwise `demo.ssd` will boot straight into the standalone demo.
 
 - Press `C` to toggle back face culling
 - Press `P` to pause the rotation
@@ -89,7 +96,7 @@ I had to make a few alterations here and there to get the code compiling in Beeb
 - The model data was read into interleaved memory addresses in the BASIC version, but BeebAsm doesn't support random access, so I concocted the various `MD_***` macros to assist with this along with an initialisation routine that de-serialised the model data back to the optimized interleaved format at runtime
 - BeebAsm has many useful functions, one of which is the `INCLUDE` directive, so the code has been broken out into separate source files, again for easier reference
 - The extra rendering options (back face culling toggle and filling toggle) were added
-- The memory locations of the quarter square multiplication tables were changes to variables rather than hard code, and `CONTIGUOUS_TABLES` was added as a compile option which frees up a bit of extra RAM to enable a couple more models
+- The memory locations of the quarter square multiplication tables were changes to variables rather than hard coded, and `CONTIGUOUS_TABLES` was added as a compile option which frees up a bit of extra RAM to enable a couple more models
 - Some extra models were incorporated from Nick's original wireframe demo, however the Icosahedron model could not be ported as is contains more than 16 surfaces (and Nick's original 'polyhed' demo did not use the optimized hidden surface routines which only allow upto 16 surfaces per model. This could be fixed but would need the code to handle models with >16 surfaces differently
 
 I strongly suspect its possible to unify the code so that theres one runtime and an ability to switch between solid and wireframe mode in realtime, but that would need some more clever tricks since the model data is different between modes, plus memory is very tight. Plus it might obfuscate the code slightly, so left open as an idea for another day!
